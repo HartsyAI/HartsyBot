@@ -15,6 +15,23 @@ namespace HartsyBot
         public void RegisterHandlers()
         {
             _client.UserJoined += OnUserJoinedAsync;
+            _client.SlashCommandExecuted += OnSlashCommandExecutedAsync;
+        }
+
+        private async Task OnSlashCommandExecutedAsync(SocketSlashCommand command)
+        {
+            match (command.Data.Name)
+            {
+                case "ping":
+                    await command.RespondAsync("Pong!");
+                    break;
+
+                case "setup_rules":
+                    // call the code from Commands.cs public async Task SetupRulesCommand()
+                    
+                    
+                    break;
+            }
         }
 
         private async Task OnUserJoinedAsync(SocketGuildUser user)

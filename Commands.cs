@@ -54,9 +54,5 @@ namespace HartsyBot
             }
         }
         [SlashCommand("ping", "Pings the bot.")]
-        public async Task PingCommand()
-        {
-            await RespondAsync("Pong!");
-        }
     }
 }
