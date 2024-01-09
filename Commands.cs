@@ -45,8 +45,8 @@ namespace HartsyBot
                     .WithButton("Notify Me", "notify_me", ButtonStyle.Primary)
                     .Build();
 
-                // Send the embed with buttons to the 'rules' channel
-                await rulesChannel.SendMessageAsync(embed: embed, components: buttonComponent);
+               // Send the embed with buttons to the 'rules' channel
+               await rulesChannel.SendMessageAsync(embed: embed, components: buttonComponent);
             }
             else
             {

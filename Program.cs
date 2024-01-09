@@ -26,9 +26,7 @@ namespace HartsyBot
 
             var config = new DiscordSocketConfig
             {
-                GatewayIntents = GatewayIntents.Guilds |
-                                 GatewayIntents.GuildMessages |
-                                 GatewayIntents.DirectMessages
+                GatewayIntents = GatewayIntents.All
             };
 
             _client = new DiscordSocketClient(config);
