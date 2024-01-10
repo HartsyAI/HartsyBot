@@ -1,11 +1,17 @@
-# Use the official image as a parent image
-FROM mcr.microsoft.com/dotnet/runtime:latest
+# Use the .NET SDK image to build the project
+FROM mcr.microsoft.com/dotnet/sdk:latest AS build
+WORKDIR /src
+COPY ["Hartsy.csproj", "./"]
+RUN dotnet restore "Hartsy.csproj"
+COPY . .
+RUN dotnet build "Hartsy.csproj" -c Release -o /app/build
 
-# Set the working directory
+# Publish the project
+FROM build AS publish
+RUN dotnet publish "Hartsy.csproj" -c Release -o /app/publish
+
+# Build the runtime image
+FROM mcr.microsoft.com/dotnet/runtime:latest AS final
 WORKDIR /app
-
-# Copy the bot files into the container at /app
-COPY . ./
-
-# Set the entry point of the application
-ENTRYPOINT ["dotnet", "YourBot.dll"]
+COPY --from=publish /app/publish .
+ENTRYPOINT ["dotnet", "Hartsy.dll"]
