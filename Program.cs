@@ -2,7 +2,7 @@
 using System.Threading.Tasks;
 using Discord;
 using Discord.WebSocket;
-using Discord.Interactions; // Added for InteractionService
+using Discord.Interactions;
 using dotenv.net;
 using dotenv.net.Utilities;
 using System.IO;
@@ -12,7 +12,7 @@ namespace HartsyBot
     class Program
     {
         private DiscordSocketClient? _client;
-        private InteractionService? _interactions; // Added for InteractionService
+        private InteractionService? _interactions;
 
         static void Main(string[] args) => new Program().MainAsync().GetAwaiter().GetResult();
 
@@ -39,7 +39,7 @@ namespace HartsyBot
             _client.Log += LogAsync;
 
             // Initialize and register event handlers
-            var eventHandlers = new EventHandlers(_client);
+            var eventHandlers = new EventHandlers(_client, _interactions);
             eventHandlers.RegisterHandlers();
 
             var token = Environment.GetEnvironmentVariable("BOT_TOKEN"); // Get the bot token from environment variables
@@ -58,7 +58,7 @@ namespace HartsyBot
                 await _interactions.RegisterCommandsGloballyAsync(true);
             };
             // Wait for a short period to ensure commands are registered
-            await Task.Delay(1000); // Delay for 1 second as an example
+            await Task.Delay(1000); // Delay for 1 second
 
         // Block this task until the program is closed.
         await Task.Delay(-1);
