@@ -53,14 +53,21 @@ namespace HartsyBot
             await RespondAsync("Pong!");
         }
 
+        //[ModalInteraction("modal_input_demo")]
+        //public async Task ModalResponse(HelloModal modal)
+
         [ModalInteraction("setup_rules_modal")]
-        public async Task OnRulesModalSubmit(SocketModal modal)
+        public async Task ModalResponse(RulesModal modal)
         {
             // Extract the data from the modal
-            var title = modal.Data.Components.FirstOrDefault(x => x.CustomId == "title_input")?.Value;
-            var description = modal.Data.Components.FirstOrDefault(x => x.CustomId == "description_input")?.Value;
-            var footer = modal.Data.Components.FirstOrDefault(x => x.CustomId == "footer_input")?.Value;
-            var author = modal.Data.Components.FirstOrDefault(x => x.CustomId == "author_input")?.Value;
+            //var title = modal.Data.Components.FirstOrDefault(x => x.CustomId == "title_input")?.Value;
+            //var description = modal.Data.Components.FirstOrDefault(x => x.CustomId == "description_input")?.Value;
+            //var footer = modal.Data.Components.FirstOrDefault(x => x.CustomId == "footer_input")?.Value;
+            //var author = modal.Data.Components.FirstOrDefault(x => x.CustomId == "author_input")?.Value;
+            var title = modal.Title;
+            var description = modal.Title;
+            var footer = modal.Greeting;
+            var author = modal.Title;
 
             // Construct the embed
             var embed = new EmbedBuilder()
@@ -97,6 +104,52 @@ namespace HartsyBot
                 await RespondAsync("Rules channel not found.", ephemeral: true);
             }
         }
+        [SlashCommand("modal", "Test modal inputs")]
+        public async Task ModalInput()
+        {
+            await Context.Interaction.RespondWithModalAsync<HelloModal>("modal_input_demo");
+        }
 
+        [ModalInteraction("modal_input_demo")]
+        public async Task ModalResponse(HelloModal modal)
+        {
+            // Build the message to send.
+            string message = $"{modal.Greeting}";
+
+            // Specify the AllowedMentions so we don't actually ping everyone.
+            AllowedMentions mentions = new();
+            // Filter for the presense of role or everyone pings
+            mentions.AllowedTypes = AllowedMentionTypes.Users;
+
+            // Respond to the modal.
+            await RespondAsync(message, allowedMentions: mentions, ephemeral: true);
+        }
     }
+
+    // Defines the modal that will be sent.
+    public class HelloModal : IModal
+    {
+        // Modal form label
+        public string Title => "Hello Modal Inputs";
+        // Text box title
+        [InputLabel("Send a greeting!")]
+        // Strings with the ModalTextInput attribute will automatically become components.
+        [ModalTextInput("greeting_input", TextInputStyle.Paragraph, placeholder: "Be nice...", maxLength: 200)]
+
+        // string to hold the user input text
+        public string? Greeting { get; set; }
+    }
+    public class RulesModal : IModal
+    {
+        // Modal form label
+        public string Title => "Hello Modal Inputs";
+        // Text box title
+        [InputLabel("Send a greeting!")]
+        // Strings with the ModalTextInput attribute will automatically become components.
+        [ModalTextInput("greeting_input", TextInputStyle.Paragraph, placeholder: "Be nice...", maxLength: 200)]
+
+        // string to hold the user input text
+        public string? Greeting { get; set; }
+    }
+
 }

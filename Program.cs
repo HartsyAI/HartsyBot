@@ -14,6 +14,8 @@ namespace HartsyBot
         private DiscordSocketClient? _client;
         private InteractionService? _interactions;
 
+        public object Context { get; private set; }
+
         static void Main(string[] args) => new Program().MainAsync().GetAwaiter().GetResult();
 
         public async Task MainAsync()
@@ -54,8 +56,20 @@ namespace HartsyBot
 
             _client.Ready += async () =>
             {
-                // Register the commands with Discord
-                await _interactions.RegisterCommandsGloballyAsync(true);
+                var guild = _client.Guilds.FirstOrDefault(); // Get the first guild the bot is in
+                if (guild != null)
+                {
+                    ulong guildId = guild.Id;
+                    if (guild != null)
+                    {
+                        //await _interactions.AddCommandsToGuildAsync(guildId, true);
+                        await _interactions.RegisterCommandsGloballyAsync(true);
+                    }
+                    else
+                    {
+                        await _interactions.RegisterCommandsGloballyAsync(true);
+                    }
+                }
             };
             // Wait for a short period to ensure commands are registered
             await Task.Delay(1000); // Delay for 1 second
