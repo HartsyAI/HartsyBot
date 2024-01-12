@@ -14,7 +14,7 @@ namespace HartsyBot
         private DiscordSocketClient? _client;
         private InteractionService? _interactions;
 
-        public object Context { get; private set; }
+        public object? Context { get; private set; }
 
         static void Main(string[] args) => new Program().MainAsync().GetAwaiter().GetResult();
 
