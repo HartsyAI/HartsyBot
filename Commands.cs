@@ -159,7 +159,7 @@ namespace HartsyBot
             // Additional fields
             [InputLabel("Server Rules")]
             [ModalTextInput("server_rules", TextInputStyle.Paragraph, maxLength: 800)]
-            public string server_rules { get; set; }
+            public string Server_rules { get; set; }
 
             [InputLabel("Code of Conduct")]
             [ModalTextInput("field2_input", TextInputStyle.Paragraph, maxLength: 400)]
@@ -183,7 +183,7 @@ namespace HartsyBot
             public RulesModal(string description, string server_rules, string field2, string field3, string field4)
             {
                 Description = description;
-                server_rules = server_rules;
+                Server_rules = server_rules;
                 Field2 = field2;
                 Field3 = field3;
                 Field4 = field4;
