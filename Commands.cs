@@ -22,7 +22,7 @@ namespace HartsyBot
 
                 // Initialize default text
                 string descriptionDefaultText = "Default description text",
-                    field1DefaultText = "Default field 1 text",
+                    server_rulesDefault = "Default field 1 text",
                     field2DefaultText = "Default field 2 text",
                     field3DefaultText = "Default field 3 text",
                     field4DefaultText = "Default field 4 text";
@@ -34,7 +34,7 @@ namespace HartsyBot
                 {
                     var embed = lastMessage.Embeds.First();
                     descriptionDefaultText = embed.Description ?? descriptionDefaultText;
-                    field1DefaultText = embed.Fields.Length > 0 ? embed.Fields[0].Value : field1DefaultText;
+                    server_rulesDefault = embed.Fields.Length > 0 ? embed.Fields[0].Value : server_rulesDefault;
                     field2DefaultText = embed.Fields.Length > 1 ? embed.Fields[1].Value : field2DefaultText;
                     field3DefaultText = embed.Fields.Length > 2 ? embed.Fields[2].Value : field3DefaultText;
                     field4DefaultText = embed.Fields.Length > 3 ? embed.Fields[3].Value : field4DefaultText;
@@ -42,9 +42,9 @@ namespace HartsyBot
                 Console.WriteLine($"descriptionDefaultText: {descriptionDefaultText}");
 
                 // Prepare the modal with default text
-                var rulesModal = new RulesModal(descriptionDefaultText, field1DefaultText, field2DefaultText, field3DefaultText, field4DefaultText);
+                var rulesModal = new RulesModal(descriptionDefaultText, server_rulesDefault, field2DefaultText, field3DefaultText, field4DefaultText);
                 Console.WriteLine($"rulesModal.Description: {rulesModal.Description}");
-                Console.WriteLine($"rulesModal.Field1: {rulesModal.Field1}");
+                Console.WriteLine($"rulesModal.server_rules: {rulesModal.server_rules}");
                 Console.WriteLine($"rulesModal.Field2: {rulesModal.Field2}");
                 Console.WriteLine($"rulesModal.Field3: {rulesModal.Field3}");
                 Console.WriteLine($"rulesModal.Field4: {rulesModal.Field4}");
@@ -90,7 +90,7 @@ namespace HartsyBot
             {
                 // Extract the data from the modal
                 var description = modal.Description;
-                var field1 = modal.Field1;
+                var server_rules = modal.server_rules;
                 var field2 = modal.Field2;
                 var field3 = modal.Field3;
                 var field4 = modal.Field4;
@@ -102,7 +102,7 @@ namespace HartsyBot
                 var embed = new EmbedBuilder()
                     .WithTitle("Welcome to the Hartsy.AI Discord Server!")
                     .WithDescription(modal.Description)
-                    .AddField("Server Rules", modal.Field1)
+                    .AddField("Server Rules", modal.server_rules)
                     .AddField("Code of Conduct", modal.Field2, true)
                     .AddField("Our Story", modal.Field3, true)
                     .AddField("What Dat Button Do?", modal.Field4, true)
@@ -158,8 +158,8 @@ namespace HartsyBot
 
             // Additional fields
             [InputLabel("Server Rules")]
-            [ModalTextInput("field1_input", TextInputStyle.Paragraph, maxLength: 800)]
-            public string Field1 { get; set; }
+            [ModalTextInput("server_rules", TextInputStyle.Paragraph, maxLength: 800)]
+            public string server_rules { get; set; }
 
             [InputLabel("Code of Conduct")]
             [ModalTextInput("field2_input", TextInputStyle.Paragraph, maxLength: 400)]
@@ -180,10 +180,10 @@ namespace HartsyBot
             }
 
             // Custom constructor with parameters
-            public RulesModal(string description, string field1, string field2, string field3, string field4)
+            public RulesModal(string description, string server_rules, string field2, string field3, string field4)
             {
                 Description = description;
-                Field1 = field1;
+                server_rules = server_rules;
                 Field2 = field2;
                 Field3 = field3;
                 Field4 = field4;
