@@ -11,55 +11,75 @@ namespace HartsyBot
         [SlashCommand("setup_rules", "Set up rules for the server.")]
         public async Task SetupRulesCommand()
         {
-            var rulesChannel = Context.Guild.TextChannels.FirstOrDefault(x => x.Name == "rules");
-            if (rulesChannel == null)
+            try
             {
-                await RespondAsync("Rules channel not found.");
-                return;
+                var rulesChannel = Context.Guild.TextChannels.FirstOrDefault(x => x.Name == "rules");
+                if (rulesChannel == null)
+                {
+                    await RespondAsync("Rules channel not found.");
+                    return;
+                }
+
+                // Initialize default text
+                string descriptionDefaultText = "Default description text",
+                    field1DefaultText = "Default field 1 text",
+                    field2DefaultText = "Default field 2 text",
+                    field3DefaultText = "Default field 3 text",
+                    field4DefaultText = "Default field 4 text";
+
+                // Extract text from the last message if available
+                var messages = await rulesChannel.GetMessagesAsync(1).FlattenAsync();
+                var lastMessage = messages.FirstOrDefault();
+                if (lastMessage != null && lastMessage.Embeds.Any())
+                {
+                    var embed = lastMessage.Embeds.First();
+                    descriptionDefaultText = embed.Description ?? descriptionDefaultText;
+                    field1DefaultText = embed.Fields.Length > 0 ? embed.Fields[0].Value : field1DefaultText;
+                    field2DefaultText = embed.Fields.Length > 1 ? embed.Fields[1].Value : field2DefaultText;
+                    field3DefaultText = embed.Fields.Length > 2 ? embed.Fields[2].Value : field3DefaultText;
+                    field4DefaultText = embed.Fields.Length > 3 ? embed.Fields[3].Value : field4DefaultText;
+                }
+                Console.WriteLine($"descriptionDefaultText: {descriptionDefaultText}");
+
+                // Prepare the modal with default text
+                var rulesModal = new RulesModal(descriptionDefaultText, field1DefaultText, field2DefaultText, field3DefaultText, field4DefaultText);
+                Console.WriteLine($"rulesModal.Description: {rulesModal.Description}");
+                Console.WriteLine($"rulesModal.Field1: {rulesModal.Field1}");
+                Console.WriteLine($"rulesModal.Field2: {rulesModal.Field2}");
+                Console.WriteLine($"rulesModal.Field3: {rulesModal.Field3}");
+                Console.WriteLine($"rulesModal.Field4: {rulesModal.Field4}");
+
+                //// Respond with the modal
+                await RespondWithModalAsync<RulesModal>("setup_rules_modal");
             }
-
-            // Initialize placeholders
-            string descriptionPlaceholder = "Enter the description",
-                field1Placeholder = "Enter field 1",
-                field2Placeholder = "Enter field 2",
-                field3Placeholder = "Enter field 3",
-                field4Placeholder = "Enter field 4";
-
-            // Check for the last message to populate the placeholders
-            var messages = await rulesChannel.GetMessagesAsync(1).FlattenAsync();
-            var lastMessage = messages.FirstOrDefault();
-            if (lastMessage != null && lastMessage.Embeds.Any())
+            catch (Exception ex)
             {
-                var embed = lastMessage.Embeds.First();
-                descriptionPlaceholder = embed.Description ?? descriptionPlaceholder;
-                // Extract fields from the embed if they exist
-                field1Placeholder = embed.Fields.Length > 0 ? embed.Fields[0].Value : field1Placeholder;
-                field2Placeholder = embed.Fields.Length > 1 ? embed.Fields[1].Value : field2Placeholder;
-                field3Placeholder = embed.Fields.Length > 2 ? embed.Fields[2].Value : field3Placeholder;
-                field4Placeholder = embed.Fields.Length > 3 ? embed.Fields[3].Value : field4Placeholder;
+                // Handle any exceptions that occur within the try block here
+                // You can log the exception or take appropriate actions
+                Console.WriteLine($"An error occurred: {ex.Message}");
+                // Optionally, you can rethrow the exception if you want it to propagate further
+                throw;
             }
-
-            // Prepare the modal with dynamic placeholders
-            var rulesModal = new RulesModal(descriptionPlaceholder, field1Placeholder, field2Placeholder, field3Placeholder, field4Placeholder);
-
-            // Build the modal using ModalBuilder
-            var modalBuilder = new ModalBuilder()
-                .WithTitle("Server Rules")
-                .WithCustomId("setup_rules_modal")
-                .AddTextInput("Description", "description_input", placeholder: rulesModal.Description, style: TextInputStyle.Paragraph, maxLength: 1000)
-                .AddTextInput("Field 1", "field1_input", placeholder: rulesModal.Field1, maxLength: 1000)
-                .AddTextInput("Field 2", "field2_input", placeholder: rulesModal.Field2, maxLength: 1000)
-                .AddTextInput("Field 3", "field3_input", placeholder: rulesModal.Field3, maxLength: 1000)
-                .AddTextInput("Field 4", "field4_input", placeholder: rulesModal.Field4, maxLength: 1000);
-
-            // Respond with the modal
-            await RespondWithModalAsync(modalBuilder.Build());
         }
 
-            [SlashCommand("ping", "Pings the bot.")]
-        public async Task PingCommand()
-        {
-            await RespondAsync("Pong!");
+        [SlashCommand("test_welcome", "Tests the Welcome message")]
+        public async Task TestCommand()
+        { //add embed to welcome message with image as attachment
+            var imagePath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "images", "welcome.png");
+            var stream = new FileStream(imagePath, FileMode.Open);
+
+            var embed = new EmbedBuilder()
+                .WithTitle("Welcome to the Hartsy.AI Discord Server!")
+                .WithDescription("This is a test of the welcome message")
+                .WithColor(Color.Blue)
+                .WithCurrentTimestamp()
+                .WithImageUrl("attachment://welcome.png")
+                .WithFooter("Click the buttons to add roles")
+                .Build();
+            // send the embed to the channel the command was run in.
+            
+            await Context.Channel.SendFileAsync(stream, "welcome.png", text: null, embed: embed);
+            await RespondAsync("Welcome message sent!", ephemeral: true);
         }
 
         [ModalInteraction("setup_rules_modal")]
@@ -75,20 +95,20 @@ namespace HartsyBot
                 var field3 = modal.Field3;
                 var field4 = modal.Field4;
 
-                var imagePath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "images", "server_rules.jpg");
+                var imagePath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "images", "server_rules.png");
                 var stream = new FileStream(imagePath, FileMode.Open);
 
                 // Construct the embed with fields from the modal
                 var embed = new EmbedBuilder()
                     .WithTitle("Welcome to the Hartsy.AI Discord Server!")
                     .WithDescription(modal.Description)
-                    .AddField("Field 1", modal.Field1, true)
-                    .AddField("Field 2", modal.Field2, true)
-                    .AddField("Field 3", modal.Field3, true)
-                    .AddField("Field 4", modal.Field4, true)
+                    .AddField("Server Rules", modal.Field1)
+                    .AddField("Code of Conduct", modal.Field2, true)
+                    .AddField("Our Story", modal.Field3, true)
+                    .AddField("What Dat Button Do?", modal.Field4, true)
                     .WithColor(Color.Blue)
                     .WithCurrentTimestamp()
-                    .WithImageUrl("attachment://server_rules.jpg")
+                    .WithImageUrl("attachment://server_rules.png")
                     .WithFooter("Click the buttons to add roles")
                     .Build();
 
@@ -113,7 +133,7 @@ namespace HartsyBot
                         .Build();
 
                     // Send the new embed with buttons to the 'rules' channel
-                    await rulesChannel.SendFileAsync(stream, "server_rules.jpg", text: null, embed: embed, components: buttonComponent);
+                    await rulesChannel.SendFileAsync(stream, "server_rules.png", text: null, embed: embed, components: buttonComponent);
                     await FollowupAsync("Rules have been updated!", ephemeral: true);
                 }
                 else
@@ -133,24 +153,24 @@ namespace HartsyBot
             public string Title => "Server Rules";
 
             [InputLabel("Description")]
-            [ModalTextInput("description_input", TextInputStyle.Paragraph, maxLength: 1000)]
+            [ModalTextInput("description_input", TextInputStyle.Paragraph, maxLength: 300)]
             public string Description { get; set; }
 
             // Additional fields
-            [InputLabel("Field 1")]
-            [ModalTextInput("field1_input", maxLength: 1000)]
+            [InputLabel("Server Rules")]
+            [ModalTextInput("field1_input", TextInputStyle.Paragraph, maxLength: 800)]
             public string Field1 { get; set; }
 
-            [InputLabel("Field 2")]
-            [ModalTextInput("field2_input", maxLength: 1000)]
+            [InputLabel("Code of Conduct")]
+            [ModalTextInput("field2_input", TextInputStyle.Paragraph, maxLength: 400)]
             public string Field2 { get; set; }
 
-            [InputLabel("Field 3")]
-            [ModalTextInput("field3_input", maxLength: 1000)]
+            [InputLabel("Our Story")]
+            [ModalTextInput("field3_input", TextInputStyle.Paragraph, maxLength: 400)]
             public string Field3 { get; set; }
 
-            [InputLabel("Field 4")]
-            [ModalTextInput("field4_input", maxLength: 1000)]
+            [InputLabel("What dat Button Do?")]
+            [ModalTextInput("field4_input", TextInputStyle.Paragraph, maxLength: 200)]
             public string Field4 { get; set; }
 
             // Parameterless constructor
@@ -160,14 +180,13 @@ namespace HartsyBot
             }
 
             // Custom constructor with parameters
-            public RulesModal(string descriptionPlaceholder, string field1Placeholder, 
-                string field2Placeholder, string field3Placeholder, string field4Placeholder)
+            public RulesModal(string description, string field1, string field2, string field3, string field4)
             {
-                Description = descriptionPlaceholder;
-                Field1 = field1Placeholder;
-                Field2 = field2Placeholder;
-                Field3 = field3Placeholder;
-                Field4 = field4Placeholder;
+                Description = description;
+                Field1 = field1;
+                Field2 = field2;
+                Field3 = field3;
+                Field4 = field4;
             }
         }
     }
