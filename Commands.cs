@@ -2,7 +2,8 @@
 using Discord.WebSocket;
 using System.Threading.Tasks;
 using Discord;
-using System.Linq; 
+using System.Linq;
+using System.Reflection.Metadata;
 
 namespace HartsyBot
 {
@@ -43,21 +44,13 @@ namespace HartsyBot
 
                 // Prepare the modal with default text
                 var rulesModal = new RulesModal(descriptionDefaultText, server_rulesDefault, field2DefaultText, field3DefaultText, field4DefaultText);
-                Console.WriteLine($"rulesModal.Description: {rulesModal.Description}");
-                Console.WriteLine($"rulesModal.server_rules: {rulesModal.Server_rules}");
-                Console.WriteLine($"rulesModal.Field2: {rulesModal.Field2}");
-                Console.WriteLine($"rulesModal.Field3: {rulesModal.Field3}");
-                Console.WriteLine($"rulesModal.Field4: {rulesModal.Field4}");
 
                 //// Respond with the modal
-                await RespondWithModalAsync<RulesModal>("setup_rules_modal");
+                await RespondWithModalAsync<RulesModal>("setup_rules_modal", rulesModal);
             }
             catch (Exception ex)
             {
-                // Handle any exceptions that occur within the try block here
-                // You can log the exception or take appropriate actions
                 Console.WriteLine($"An error occurred: {ex.Message}");
-                // Optionally, you can rethrow the exception if you want it to propagate further
                 throw;
             }
         }
@@ -151,6 +144,7 @@ namespace HartsyBot
         public class RulesModal : IModal
         {
             public string Title => "Server Rules";
+            
 
             [InputLabel("Description")]
             [ModalTextInput("description_input", TextInputStyle.Paragraph, maxLength: 300)]
@@ -158,7 +152,10 @@ namespace HartsyBot
 
             // Additional fields
             [InputLabel("Server Rules")]
-            [ModalTextInput("server_rules", TextInputStyle.Paragraph, maxLength: 800)]
+            // set placeholder text
+            
+            [ModalTextInput("server_rules", TextInputStyle.Paragraph, 
+                placeholder: "Enter Server Rules", initValue:$"rules", maxLength: 800)]
             public string Server_rules { get; set; }
 
             [InputLabel("Code of Conduct")]
