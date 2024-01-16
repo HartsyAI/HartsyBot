@@ -44,7 +44,7 @@ namespace HartsyBot
                 // Prepare the modal with default text
                 var rulesModal = new RulesModal(descriptionDefaultText, server_rulesDefault, field2DefaultText, field3DefaultText, field4DefaultText);
                 Console.WriteLine($"rulesModal.Description: {rulesModal.Description}");
-                Console.WriteLine($"rulesModal.server_rules: {rulesModal.server_rules}");
+                Console.WriteLine($"rulesModal.server_rules: {rulesModal.Server_rules}");
                 Console.WriteLine($"rulesModal.Field2: {rulesModal.Field2}");
                 Console.WriteLine($"rulesModal.Field3: {rulesModal.Field3}");
                 Console.WriteLine($"rulesModal.Field4: {rulesModal.Field4}");
@@ -90,7 +90,7 @@ namespace HartsyBot
             {
                 // Extract the data from the modal
                 var description = modal.Description;
-                var server_rules = modal.server_rules;
+                var server_rules = modal.Server_rules;
                 var field2 = modal.Field2;
                 var field3 = modal.Field3;
                 var field4 = modal.Field4;
@@ -102,7 +102,7 @@ namespace HartsyBot
                 var embed = new EmbedBuilder()
                     .WithTitle("Welcome to the Hartsy.AI Discord Server!")
                     .WithDescription(modal.Description)
-                    .AddField("Server Rules", modal.server_rules)
+                    .AddField("Server Rules", modal.Server_rules)
                     .AddField("Code of Conduct", modal.Field2, true)
                     .AddField("Our Story", modal.Field3, true)
                     .AddField("What Dat Button Do?", modal.Field4, true)
