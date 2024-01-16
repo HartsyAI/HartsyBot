@@ -55,26 +55,6 @@ namespace HartsyBot
             }
         }
 
-        [SlashCommand("test_welcome", "Tests the Welcome message")]
-        public async Task TestCommand()
-        { //add embed to welcome message with image as attachment
-            var imagePath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "images", "welcome.png");
-            var stream = new FileStream(imagePath, FileMode.Open);
-
-            var embed = new EmbedBuilder()
-                .WithTitle("Welcome to the Hartsy.AI Discord Server!")
-                .WithDescription("This is a test of the welcome message")
-                .WithColor(Color.Blue)
-                .WithCurrentTimestamp()
-                .WithImageUrl("attachment://welcome.png")
-                .WithFooter("Click the buttons to add roles")
-                .Build();
-            // send the embed to the channel the command was run in.
-            
-            await Context.Channel.SendFileAsync(stream, "welcome.png", text: null, embed: embed);
-            await RespondAsync("Welcome message sent!", ephemeral: true);
-        }
-
         [ModalInteraction("setup_rules_modal")]
         public async Task OnRulesModalSubmit(RulesModal modal)
         {
@@ -181,6 +161,24 @@ namespace HartsyBot
                 OurStory = ourStory;
                 ButtonFunctionDescription = buttonFunctionDescription;
             }
+        }
+        [SlashCommand("test_welcome", "Tests the Welcome message")]
+        public async Task TestCommand()
+        {
+            // Path to the image
+            var imagePath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "images", "welcome.png");
+
+            // Open the image file
+            using (var stream = new FileStream(imagePath, FileMode.Open))
+            {
+                // Message to be sent, mentioning the user who initiated the command
+                string message = $"{Context.User.Mention}, welcome to the Hartsy.AI Discord Server!";
+
+                // Send the image along with the message
+                await Context.Channel.SendFileAsync(stream, "welcome.png", message);
+            }
+            // Respond to the command.
+            await RespondAsync("Welcome message sent!", ephemeral: true);
         }
     }
 }

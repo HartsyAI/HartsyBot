@@ -28,11 +28,24 @@ namespace HartsyBot
 
         private async Task OnUserJoinedAsync(SocketGuildUser user)
         {
-            var channel = user.Guild.DefaultChannel; // Default channel of the server
+            // Get the default channel of the server
+            var channel = user.Guild.DefaultChannel; 
             if (channel != null)
             {
-                await channel.SendMessageAsync($"Welcome to the server, {user.Mention}!");
+                // Path to the image
+                var imagePath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "images", "welcome.png");
+
+                // Open the image file
+                using (var stream = new FileStream(imagePath, FileMode.Open))
+                {
+                    // Message to be sent, welcoming the user who joined
+                    string welcomeMessage = $"{user.Mention}, welcome to the Hartsy.AI Discord Server!";
+
+                    // Send the image along with the welcome message
+                    await channel.SendFileAsync(stream, "welcome.png", welcomeMessage);
+                }
             }
         }
     }
+
 }
