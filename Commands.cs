@@ -26,7 +26,7 @@ namespace HartsyBot
                     defaultServerRules = "Default server rules text",
                     defaultCodeOfConduct = "Default code of conduct text",
                     defaultOurStory = "Default our story text",
-                    defaultButtonFunctionDescription = "Default button function description text";
+                    defaultButtonFunction = "Default button function description text";
 
                 // Extract text from the last message if available
                 var messages = await rulesChannel.GetMessagesAsync(1).FlattenAsync();
@@ -38,12 +38,11 @@ namespace HartsyBot
                     defaultServerRules = embed.Fields.Length > 0 ? embed.Fields[0].Value : defaultServerRules;
                     defaultCodeOfConduct = embed.Fields.Length > 1 ? embed.Fields[1].Value : defaultCodeOfConduct;
                     defaultOurStory = embed.Fields.Length > 2 ? embed.Fields[2].Value : defaultOurStory;
-                    defaultButtonFunctionDescription = embed.Fields.Length > 3 ? embed.Fields[3].Value : defaultButtonFunctionDescription;
+                    defaultButtonFunction = embed.Fields.Length > 3 ? embed.Fields[3].Value : defaultButtonFunction;
                 }
-                Console.WriteLine($"Default Description: {defaultDescription}");
 
                 // Prepare the modal with default text
-                var rulesModal = new RulesModal(defaultDescription, defaultServerRules, defaultCodeOfConduct, defaultOurStory, defaultButtonFunctionDescription);
+                var rulesModal = new RulesModal(defaultDescription, defaultServerRules, defaultCodeOfConduct, defaultOurStory, defaultButtonFunction);
 
                 // Respond with the modal
                 await RespondWithModalAsync<RulesModal>("setup_rules_modal", rulesModal);
@@ -66,7 +65,7 @@ namespace HartsyBot
                 var server_rules = modal.Server_rules;
                 var codeOfConduct = modal.CodeOfConduct;
                 var ourStory = modal.OurStory;
-                var buttonFunctionDescription = modal.ButtonFunctionDescription;
+                var ButtonFunction = modal.ButtonFunction;
 
                 var imagePath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "images", "server_rules.png");
                 var stream = new FileStream(imagePath, FileMode.Open);
@@ -78,7 +77,7 @@ namespace HartsyBot
                     .AddField("Server Rules", modal.Server_rules)
                     .AddField("Code of Conduct", modal.CodeOfConduct, true)
                     .AddField("Our Story", modal.OurStory, true)
-                    .AddField("What Does This Button Do?", modal.ButtonFunctionDescription, true)
+                    .AddField("What Does This Button Do?", modal.ButtonFunction, true)
                     .WithColor(Color.Blue)
                     .WithCurrentTimestamp()
                     .WithImageUrl("attachment://server_rules.png")
@@ -128,38 +127,38 @@ namespace HartsyBot
             [InputLabel("Description")]
             [ModalTextInput("description_input", TextInputStyle.Paragraph, 
             placeholder: "Enter a brief description", maxLength: 300)]
-            public string Description { get; set; }
+            public string? Description { get; set; }
 
             [InputLabel("Server Rules")]
             [ModalTextInput("server_rules", TextInputStyle.Paragraph, 
             placeholder: "List the server rules here", maxLength: 800)]
-            public string Server_rules { get; set; }
+            public string? Server_rules { get; set; }
 
             [InputLabel("Code of Conduct")]
             [ModalTextInput("code_of_conduct_input", TextInputStyle.Paragraph, 
             placeholder: "Describe the code of conduct", maxLength: 400)]
-            public string CodeOfConduct { get; set; }
+            public string? CodeOfConduct { get; set; }
 
             [InputLabel("Our Story")]
             [ModalTextInput("our_story_input", TextInputStyle.Paragraph, 
             placeholder: "Share the story of your community", maxLength: 400)]
-            public string OurStory { get; set; }
+            public string? OurStory { get; set; }
 
             [InputLabel("What Does This Button Do?")]
             [ModalTextInput("button_function_description_input", TextInputStyle.Paragraph, 
             placeholder: "Explain the function of this button", maxLength: 200)]
-            public string ButtonFunctionDescription { get; set; }
+            public string? ButtonFunction { get; set; }
 
             // Constructors
             public RulesModal() { /* ... */ }
-            public RulesModal(string description, string server_rules, string codeOfConduct, string ourStory, string buttonFunctionDescription) 
+            public RulesModal(string description, string server_rules, string codeOfConduct, string ourStory, string buttonFunction) 
             {
                 // Initialize with provided values
                 Description = description;
                 Server_rules = server_rules;
                 CodeOfConduct = codeOfConduct;
                 OurStory = ourStory;
-                ButtonFunctionDescription = buttonFunctionDescription;
+                ButtonFunction = buttonFunction;
             }
         }
         [SlashCommand("test_welcome", "Tests the Welcome message")]
