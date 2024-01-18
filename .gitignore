@@ -157,3 +157,5 @@ ScaffoldingReadMe.txt
 
 # .env file
 .env
+# sub folders inside of the images folder
+images/**/*
