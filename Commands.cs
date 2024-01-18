@@ -4,6 +4,9 @@ using System.Threading.Tasks;
 using Discord;
 using System.Linq;
 using System.Reflection.Metadata;
+using System.Net.Mail;
+using Microsoft.VisualBasic;
+using System.Threading.Channels;
 
 namespace HartsyBot
 {
@@ -179,5 +182,63 @@ namespace HartsyBot
             // Respond to the command.
             await RespondAsync("Welcome message sent!", ephemeral: true);
         }
+
+        [SlashCommand("test_image_gen", "Generate an image from a prompt")]
+        public async Task TestImageGenerationCommand(string prompt)
+        {
+            // Defer the interaction to buy time for image generation
+            await DeferAsync();
+
+            // Create a placeholder embed
+            var embed = new EmbedBuilder()
+                .WithAuthor(Context.User)
+                .WithTitle("Your logo")
+                .WithDescription($"Generating an image for **{Context.User.Username}**\n**Prompt:**`{prompt}`")
+                .WithColor(Color.Blue)
+                .WithCurrentTimestamp()
+                .Build();
+
+            // Update the original response with the placeholder embed
+            await Context.Interaction.ModifyOriginalResponseAsync(msg => msg.Embed = embed);
+
+            // Generate the image
+            var base64Images = await StableSwarmAPI.GenerateImage(prompt);
+            if (base64Images.Count > 0)
+            {
+                var apiInstance = new StableSwarmAPI();
+                string filePath = await apiInstance.ConvertAndSaveImage(base64Images[0], Context.User.Username, Context.Interaction.Id, "jpg");
+                // Filename used in the attachment
+                string filename = Path.GetFileName(filePath);
+
+                if (!string.IsNullOrEmpty(filePath))
+                {
+                    // Modify the message by grabbing the embed and generate a embedbuilder
+                    var newMessage = await Context.Interaction.GetOriginalResponseAsync();
+                    var updatedEmbed = newMessage.Embeds.First().ToEmbedBuilder();
+                    updatedEmbed.WithDescription($"Generated an image for **{Context.User.Username}**\n**Prompt:**`{prompt}`");
+                    updatedEmbed.WithImageUrl($"attachment://{filename}");
+                    var fileAttachment = new FileAttachment(filePath);
+
+
+                    // Update the original response with the new embed and attachment
+                    await newMessage.ModifyAsync(m =>
+                    {
+                        m.Embed = updatedEmbed.Build();
+                        m.Attachments = new[] { fileAttachment };
+                    });
+                    // send a new messahe to the channel with the same embed and attached file
+                    //await Context.Channel.SendFileAsync(filePath, embed: updatedEmbed.Build());
+                }
+                else
+                {
+                    await Context.Interaction.ModifyOriginalResponseAsync(msg => msg.Content = "Failed to generate image.");
+                }
+            }
+            else
+            {
+                await Context.Interaction.ModifyOriginalResponseAsync(msg => msg.Content = "No images were generated.");
+            }
+        }
+
     }
 }
