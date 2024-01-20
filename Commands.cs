@@ -7,6 +7,9 @@ using System.Reflection.Metadata;
 using System.Net.Mail;
 using Microsoft.VisualBasic;
 using System.Threading.Channels;
+using System.Text.RegularExpressions;
+using Newtonsoft.Json.Linq;
+using System.ComponentModel;
 
 namespace HartsyBot
 {
@@ -183,18 +186,239 @@ namespace HartsyBot
             await RespondAsync("Welcome message sent!", ephemeral: true);
         }
 
-        [SlashCommand("test_image_gen", "Generate an image from a prompt")]
-        public async Task TestImageGenerationCommand(string prompt)
+        [SlashCommand("logo_generator", "Generate an image from a prompt")]
+        public async Task ImageGenerationCommand(
+            [Summary("text", "The text you want to appear in the image.")] string text,
+            [Summary("template", "Choose a template for the image.")]
+            [Choice("Rainbow Flow", "Template1"),
+                Choice("Phantom Grove", "Template2"),
+                Choice("Shroomantic", "Template3"),
+                Choice("Quantum Canvas", "Template4"),
+                Choice("Appster", "Template5"),
+                Choice("Brandtastic", "Template6"),
+                Choice("video game", "Template7"),
+                Choice("Speaking Sushi ", "Template8"),
+                Choice("video game alternate", "Template9"),
+                Choice("Unholy Textament", "Template10"),
+                Choice("Words of Wildstyle", "Template11"),
+                Choice("Dreamsmith", "Template12"),
+                Choice("Cosmic Comics", "Template13"),
+            ] string template,
+            [Summary("description", "Describe other aspects of the image.")] string description)
         {
+            string templated = "";
+            Dictionary<string, string> settings = new Dictionary<string, string>(); // TODO: Add in correct settings for each template
+
+            switch (template)
+            {
+                case "Template1":
+                    
+                    templated = $"({text}:1.6) (text logo:1.3), rainbow pixel art lettering, " +
+                                    $"voxel based, vibrant colored paint splattered, dripping paint in " +
+                                    $"intertwining intricate patterns to form geometrical shapes, " +
+                                    $"technicolor clouds fill the sky, {description}";
+                    settings = new Dictionary<string, string>
+                                {
+                                    { "lora", "Harrlogos" },
+                                    { "weight", "1" },
+                                    { "scheduler", "Euler" },
+                                    { "sampler", "Karras" },
+                                    { "steps", "24" },
+                                    { "CFG", "3.4" }
+                                };
+                    break;
+                case "Template2":
+                    templated = $"({text}:1.5) (text logo:1.3), green dripping ooze letters, surrounded by spikey interwoven designs, " +
+                                      $"a foggy forest in the dark of night, skeletons rise through the forest with glowing neon green eyes, " +
+                                      $"while a moon illuminates rays through the fog, the background is deep purple and eerie, {description}";
+                    settings = new Dictionary<string, string>
+                                {
+                                    { "lora", "Harrlogos" },
+                                    { "weight", "1" },
+                                    { "scheduler", "Euler" },
+                                    { "sampler", "Karras" },
+                                    { "steps", "24" },
+                                    { "CFG", "3.4" }
+                                };
+                    break;
+
+                case "Template3":
+                    templated = $"({text}:1.5) (text logo:1.3), salient bold neon rainbow lettering, " +
+                                      $"Enthralling fantasy forest, brimming with oversized, luminescent mushrooms, " +
+                                      $"gigantic ancient tree with a face, whispering secrets, {description}";
+                    settings = new Dictionary<string, string>
+                                {
+                                    { "lora", "Harrlogos" },
+                                    { "weight", "1" },
+                                    { "scheduler", "Euler" },
+                                    { "sampler", "Karras" },
+                                    { "steps", "24" },
+                                    { "CFG", "3.4" }
+                                };
+                    break;
+
+                case "Template4":
+                    templated = $"({text}:1.5) (text logo:1.3), shiny bold metallic lettering, complex photorealistic computer chip, " +
+                                      $"covered with intertwined, luminescent rgb wires, {description}";
+                    settings = new Dictionary<string, string>
+                                {
+                                    { "lora", "Harrlogos" },
+                                    { "weight", "1" },
+                                    { "scheduler", "Euler" },
+                                    { "sampler", "Karras" },
+                                    { "steps", "24" },
+                                    { "CFG", "3.4" }
+                                };
+                    break;
+
+                case "Template5":
+                    templated = $"({text}:1.6) (text logo:1.3), colorful, app logo, artistic, minimalist, professional logo, simple, {description}";
+                    settings = new Dictionary<string, string>
+                                {
+                                    { "lora", "Harrlogos" },
+                                    { "weight", "1" },
+                                    { "scheduler", "Euler" },
+                                    { "sampler", "Karras" },
+                                    { "steps", "24" },
+                                    { "CFG", "3.4" }
+                                };
+                    break;
+
+                case "Template6":
+                    templated = $"({text}:1.5) (text logo:1.3), popular company text logo, professional, corporate logo design, " +
+                                      $"simple colors, minimalist, {description}";
+                    settings = new Dictionary<string, string>
+                                {
+                                    { "lora", "Harrlogos" },
+                                    { "weight", "1" },
+                                    { "scheduler", "Euler" },
+                                    { "sampler", "Karras" },
+                                    { "steps", "24" },
+                                    { "CFG", "3.4" }
+                                };
+                    break;
+
+                case "Template7":
+                    templated = $"({text}:1.4) (text logo:1.3), pixel art 16-bit style, video game title screen, " +
+                                      $"elemental weapons, ornate armor, assorted video game item sprites, clouds, {description}";
+                    settings = new Dictionary<string, string>
+                                {
+                                    { "lora", "Harrlogos" },
+                                    { "weight", "1" },
+                                    { "scheduler", "Euler" },
+                                    { "sampler", "Karras" },
+                                    { "steps", "24" },
+                                    { "CFG", "3.4" }
+                                };
+                    break;
+
+                case "Template8":
+                    templated = $"({text}:1.5) text logo, Sushi, japanese, decorated with wasabi and salmon roe, " +
+                                      $"{description}";
+                    settings = new Dictionary<string, string>
+                                {
+                                    { "lora", "Harrlogos" },
+                                    { "weight", "1" },
+                                    { "scheduler", "Euler" },
+                                    { "sampler", "Karras" },
+                                    { "steps", "24" },
+                                    { "CFG", "3.4" }
+                                };
+                    break;
+
+                case "Template9":
+                    templated = $"({text}:1.5) text logo, pixel art, video game title screen, elemental weapon, " +
+                                      $"ornate armor, adventure game setting, clouds, {description}, Settings: FUSTERCLUCK checkpoint, " +
+                                      $"harrlogos weight 1 22 steps, 4.5 CFG";
+                    settings = new Dictionary<string, string>
+                                {
+                                    { "lora", "Harrlogos" },
+                                    { "weight", "1" },
+                                    { "scheduler", "Karras" },
+                                    { "steps", "22" },
+                                    { "CFG", "4.5" }
+                                };
+                    break;
+
+                case "Template10":
+                    templated = $"({text}:1.5) (text logo:1.3), salient bold spikey drippy lettering, terrifying depths of hell, " +
+                                      $"brimming with oversized, luminescent pentagrams, inverted crosses glowing in the darkness, " +
+                                      $"amidst a river of blood, nightmarish, {description}";
+                    settings = new Dictionary<string, string>
+                                {
+                                    { "lora", "Harrlogos" },
+                                    { "scheduler", "dpmpp se gpu" },
+                                    { "sampler", "Karras" },
+                                    { "steps", "35" },
+                                    { "CFG", "3.7" }
+                                };
+                    break;
+
+                case "Template11":
+                    templated = $"({text}:1.5) (text logo:1.3), wildstyle 90 graffiti, thick lines, dripping oil based colors, " +
+                                      $"black brick wall, urban city sidewalk, dim streetlight, at night, {description}";
+                    settings = new Dictionary<string, string>
+                                {
+                                    { "lora", "Harrlogos" },
+                                    { "weight", "1" },
+                                    { "scheduler", "Euler" },
+                                    { "sampler", "Karras" },
+                                    { "steps", "24" },
+                                    { "CFG", "3.4" }
+                                };
+                    break;
+
+                case "Template12":
+                    templated = $"({text}:1.5) (text logo:1.3), dreamscape landscape, strange future, secret nature, chroma, " +
+                                      $"Surreal, ethereal, dreamy, mysterious, fantasy, highly detailed, {description}";
+                    settings = new Dictionary<string, string>
+                                {
+                                    { "lora", "Harrlogos" },
+                                    { "weight", "1" },
+                                    { "scheduler", "Euler" },
+                                    { "sampler", "Karras" },
+                                    { "steps", "24" },
+                                    { "CFG", "3.4" }
+                                };
+                    break;
+
+                case "Template13":
+                    templated = $"({text}:1.5) (text logo:1.3), comic book cover illustration, thick comic book title lettering " +
+                                      $"in an outer space scene, planet, moons orbiting, holographic meteors leave technicolor trails " +
+                                      $"in the vast black emptiness of the universe, {description}";
+                    settings = new Dictionary<string, string>
+                                {
+                                    { "lora", "Harrlogos" },
+                                    { "weight", "1" },
+                                    { "scheduler", "Euler" },
+                                    { "sampler", "Karras" },
+                                    { "steps", "24" },
+                                    { "CFG", "3.4" }
+                                };
+                    break;
+
+                default:
+                    // If no template matches
+                    Console.WriteLine("Unknown template.");
+                    await RespondAsync("Unknown template. Please try again and choose a template.", ephemeral: true);
+                    break;
+            }
+
+            // Construct the prompt from the parameters
+            string prompt = templated;
+
             // Defer the interaction to buy time for image generation
             await DeferAsync();
 
             // Create a placeholder embed
             var embed = new EmbedBuilder()
                 .WithAuthor(Context.User)
-                .WithTitle("Your logo")
-                .WithDescription($"Generating an image for **{Context.User.Username}**\n**Prompt:**`{prompt}`")
-                .WithColor(Color.Blue)
+                .WithTitle("Your Hartsy.AI Generated Image")
+                .WithDescription($"Generating an image described by **{Context.User.Username}**\n" +
+                 $"**Prompt:** `{prompt}`\n\n" +
+                 "+-------Please wait while your image is being generated-------+\n\n")
+                .WithColor(Color.DarkerGrey)
+                .WithFooter("CFG:4.5|Steps:35|Height:768|Width:1024")
                 .WithCurrentTimestamp()
                 .Build();
 
@@ -216,9 +440,9 @@ namespace HartsyBot
                     var newMessage = await Context.Interaction.GetOriginalResponseAsync();
                     var updatedEmbed = newMessage.Embeds.First().ToEmbedBuilder();
                     updatedEmbed.WithDescription($"Generated an image for **{Context.User.Username}**\n**Prompt:**`{prompt}`");
+                    updatedEmbed.WithColor(Color.Green);
                     updatedEmbed.WithImageUrl($"attachment://{filename}");
                     var fileAttachment = new FileAttachment(filePath);
-
 
                     // Update the original response with the new embed and attachment
                     await newMessage.ModifyAsync(m =>
@@ -226,8 +450,6 @@ namespace HartsyBot
                         m.Embed = updatedEmbed.Build();
                         m.Attachments = new[] { fileAttachment };
                     });
-                    // send a new messahe to the channel with the same embed and attached file
-                    //await Context.Channel.SendFileAsync(filePath, embed: updatedEmbed.Build());
                 }
                 else
                 {
