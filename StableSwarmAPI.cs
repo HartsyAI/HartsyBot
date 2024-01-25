@@ -51,7 +51,7 @@ public class StableSwarmAPI
             ["donotsave"] = true,
             ["model"] = "starlightXLAnimated_v3.safetensors",
             ["loras"] = "Harrlogos_v2.0.safetensors",
-            ["loraweights"] = 1,
+            ["loraweights"] = 1.2,
             ["width"] = 1024,
             ["height"] = 768,
             ["cfgscale"] = 4.5,

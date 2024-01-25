@@ -107,7 +107,7 @@ namespace HartsyBot
                     // Define the buttons
                     var buttonComponent = new ComponentBuilder()
                         .WithButton("I Read the Rules", "read_rules", ButtonStyle.Success)
-                        .WithButton("Notify Me", "notify_me", ButtonStyle.Primary)
+                        .WithButton("Don't Notify Me", "notify_me", ButtonStyle.Primary)
                         .Build();
 
                     // Send the new embed with buttons to the 'rules' channel
@@ -167,53 +167,37 @@ namespace HartsyBot
                 ButtonFunction = buttonFunction;
             }
         }
-        [SlashCommand("test_welcome", "Tests the Welcome message")]
-        public async Task TestCommand()
-        {
-            // Path to the image
-            var imagePath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "images", "welcome.png");
-
-            // Open the image file
-            using (var stream = new FileStream(imagePath, FileMode.Open))
-            {
-                // Message to be sent, mentioning the user who initiated the command
-                string message = $"{Context.User.Mention}, welcome to the Hartsy.AI Discord Server!";
-
-                // Send the image along with the message
-                await Context.Channel.SendFileAsync(stream, "welcome.png", message);
-            }
-            // Respond to the command.
-            await RespondAsync("Welcome message sent!", ephemeral: true);
-        }
 
         [SlashCommand("logo_generator", "Generate an image from a prompt")]
         public async Task ImageGenerationCommand(
             [Summary("text", "The text you want to appear in the image.")] string text,
             [Summary("template", "Choose a template for the image.")]
-            [Choice("Rainbow Flow", "Template1"),
-                Choice("Phantom Grove", "Template2"),
-                Choice("Shroomantic", "Template3"),
-                Choice("Quantum Canvas", "Template4"),
-                Choice("Appster", "Template5"),
-                Choice("Brandtastic", "Template6"),
-                Choice("video game", "Template7"),
-                Choice("Speaking Sushi ", "Template8"),
-                Choice("video game alternate", "Template9"),
-                Choice("Unholy Textament", "Template10"),
-                Choice("Words of Wildstyle", "Template11"),
-                Choice("Dreamsmith", "Template12"),
-                Choice("Cosmic Comics", "Template13"),
+            [Choice("Rainbow Flow", "Rainbow"),
+                Choice("Phantom Grove", "Phantom"),
+                Choice("Shroomantic", "Shroomantic"),
+                Choice("Quantum Canvas", "Quantum"),
+                Choice("Appster", "Appster"),
+                Choice("Brandtastic", "Brandtastic"),
+                Choice("Pixel Playground", "Pixel"),
+                Choice("Speaking Sushi ", "Sushi"),
+                Choice("video game alternate", "alternate"),
+                Choice("Unholy Textament", "UnholyTextament"),
+                Choice("Words of Wildstyle", "Wildstyle"),
+                Choice("Dreamsmith", "Dreamsmith"),
+                Choice("Cosmic Comics", "Comics"),
+                Choice("Diamond Design", "Diamond")
             ] string template,
             [Summary("description", "Describe other aspects of the image.")] string description)
         {
             string templated = "";
             Dictionary<string, string> settings = new Dictionary<string, string>(); // TODO: Add in correct settings for each template
+            string TemplateInfo = "";
 
             switch (template)
             {
-                case "Template1":
+                case "Rainbow":
                     
-                    templated = $"({text}:1.6) (text logo:1.3), rainbow pixel art lettering, " +
+                    templated = $"(\"{text}\":1.6) (text logo:1.3), rainbow pixel art lettering, " +
                                     $"voxel based, vibrant colored paint splattered, dripping paint in " +
                                     $"intertwining intricate patterns to form geometrical shapes, " +
                                     $"technicolor clouds fill the sky, {description}";
@@ -226,9 +210,11 @@ namespace HartsyBot
                                     { "steps", "24" },
                                     { "CFG", "3.4" }
                                 };
+                    TemplateInfo = "Combining the natural world with a neon palette, this template is designed to create striking images " +
+                                    $"that stand out with a blend of organic shapes and bright, artificial colors.";
                     break;
-                case "Template2":
-                    templated = $"({text}:1.5) (text logo:1.3), green dripping ooze letters, surrounded by spikey interwoven designs, " +
+                case "Phantom":
+                    templated = $"(\"{text}\":1.5) (text logo:1.3), green dripping ooze letters, surrounded by spikey interwoven designs, " +
                                       $"a foggy forest in the dark of night, skeletons rise through the forest with glowing neon green eyes, " +
                                       $"while a moon illuminates rays through the fog, the background is deep purple and eerie, {description}";
                     settings = new Dictionary<string, string>
@@ -240,10 +226,12 @@ namespace HartsyBot
                                     { "steps", "24" },
                                     { "CFG", "3.4" }
                                 };
+                    TemplateInfo = "Capturing the essence of eerie folktales and legends skeletal figures are given a ghastly hue from an unfarmiliar " +
+                                    $"moon, great for story-driven or narrative content. Guaranteed to leave your audience in goosebumps.";
                     break;
 
-                case "Template3":
-                    templated = $"({text}:1.5) (text logo:1.3), salient bold neon rainbow lettering, " +
+                case "Shroomantic":
+                    templated = $"\"({text}\":1.5) (text logo:1.3), salient bold neon rainbow lettering, " +
                                       $"Enthralling fantasy forest, brimming with oversized, luminescent mushrooms, " +
                                       $"gigantic ancient tree with a face, whispering secrets, {description}";
                     settings = new Dictionary<string, string>
@@ -255,10 +243,11 @@ namespace HartsyBot
                                     { "steps", "24" },
                                     { "CFG", "3.4" }
                                 };
+                    TemplateInfo = "The template offers a trippy, colorful woodland experience, a pathway to capturing immersive imagination.";
                     break;
 
-                case "Template4":
-                    templated = $"({text}:1.5) (text logo:1.3), shiny bold metallic lettering, complex photorealistic computer chip, " +
+                case "Quantum":
+                    templated = $"(\"{text}\":1.5) (text logo:1.3), shiny bold metallic lettering, complex photorealistic computer chip, " +
                                       $"covered with intertwined, luminescent rgb wires, {description}";
                     settings = new Dictionary<string, string>
                                 {
@@ -269,10 +258,11 @@ namespace HartsyBot
                                     { "steps", "24" },
                                     { "CFG", "3.4" }
                                 };
+                    TemplateInfo = "A backdrop designed for tech enthusiasts to inscribe their own message, merging the art of communication with the precision of technology.";
                     break;
 
-                case "Template5":
-                    templated = $"({text}:1.6) (text logo:1.3), colorful, app logo, artistic, minimalist, professional logo, simple, {description}";
+                case "Appster":
+                    templated = $"(\"{text}\":1.6) (text logo:1.3), colorful, app logo, artistic, minimalist, professional logo, simple, {description}";
                     settings = new Dictionary<string, string>
                                 {
                                     { "lora", "Harrlogos" },
@@ -282,10 +272,11 @@ namespace HartsyBot
                                     { "steps", "24" },
                                     { "CFG", "3.4" }
                                 };
+                    TemplateInfo = "Creativity through subtlety, this template creates content that not only screams to be clicked or tapped, but also remembered.";
                     break;
 
-                case "Template6":
-                    templated = $"({text}:1.5) (text logo:1.3), popular company text logo, professional, corporate logo design, " +
+                case "Brandtastic":
+                    templated = $"(\"{text}\":1.5) (text logo:1.3), popular company text logo, professional, corporate logo design, " +
                                       $"simple colors, minimalist, {description}";
                     settings = new Dictionary<string, string>
                                 {
@@ -296,11 +287,12 @@ namespace HartsyBot
                                     { "steps", "24" },
                                     { "CFG", "3.4" }
                                 };
+                    TemplateInfo = "Minimalist, elegant, clean. This template will put a (type)face to your name.";
                     break;
 
-                case "Template7":
-                    templated = $"({text}:1.4) (text logo:1.3), pixel art 16-bit style, video game title screen, " +
-                                      $"elemental weapons, ornate armor, assorted video game item sprites, clouds, {description}";
+                case "Pixel":
+                    templated = $"(\"{text}\":1.6) (text logo:1.3), colorful, pixel art, video game title screen, voxel based, " +
+                                $"(16 - bit pixel art), weapon, clouds, {description}";
                     settings = new Dictionary<string, string>
                                 {
                                     { "lora", "Harrlogos" },
@@ -310,10 +302,12 @@ namespace HartsyBot
                                     { "steps", "24" },
                                     { "CFG", "3.4" }
                                 };
+                    TemplateInfo = "Where pixel art meets pictuesque, this template offers all the nostalgia of classic video game graphics, " +
+                                    $"while also giving creative control liike never before. ";
                     break;
 
-                case "Template8":
-                    templated = $"({text}:1.5) text logo, Sushi, japanese, decorated with wasabi and salmon roe, " +
+                case "Sushi":
+                    templated = $"(\"{text}\":1.5) (text logo:1.4), Sushi, japanese, decorated with wasabi and salmon roe, " +
                                       $"{description}";
                     settings = new Dictionary<string, string>
                                 {
@@ -324,12 +318,12 @@ namespace HartsyBot
                                     { "steps", "24" },
                                     { "CFG", "3.4" }
                                 };
+                    TemplateInfo = "A creative template for composing text within a delicious sushi arrangement, decorated by traditional Japanese garnishes.";
                     break;
 
-                case "Template9":
-                    templated = $"({text}:1.5) text logo, pixel art, video game title screen, elemental weapon, " +
-                                      $"ornate armor, adventure game setting, clouds, {description}, Settings: FUSTERCLUCK checkpoint, " +
-                                      $"harrlogos weight 1 22 steps, 4.5 CFG";
+                case "alternate":
+                    templated = $"(\"{text}\":1.5) text logo, pixel art, video game title screen, elemental weapon, " +
+                                      $"ornate armor, adventure game setting, clouds, {description}";
                     settings = new Dictionary<string, string>
                                 {
                                     { "lora", "Harrlogos" },
@@ -338,10 +332,11 @@ namespace HartsyBot
                                     { "steps", "22" },
                                     { "CFG", "4.5" }
                                 };
+                    TemplateInfo = "video game alternate";
                     break;
 
-                case "Template10":
-                    templated = $"({text}:1.5) (text logo:1.3), salient bold spikey drippy lettering, terrifying depths of hell, " +
+                case "UnholyTextament":
+                    templated = $"(\"{text}\":1.5) (text logo:1.3), salient bold spikey drippy lettering, terrifying depths of hell, " +
                                       $"brimming with oversized, luminescent pentagrams, inverted crosses glowing in the darkness, " +
                                       $"amidst a river of blood, nightmarish, {description}";
                     settings = new Dictionary<string, string>
@@ -352,10 +347,11 @@ namespace HartsyBot
                                     { "steps", "35" },
                                     { "CFG", "3.7" }
                                 };
+                    TemplateInfo = "Ideal for conveying a sense of the macabre, this template includes elements of gothic horror and heavy metal motifs.";
                     break;
 
-                case "Template11":
-                    templated = $"({text}:1.5) (text logo:1.3), wildstyle 90 graffiti, thick lines, dripping oil based colors, " +
+                case "Wildstyle":
+                    templated = $"(\"{text}\":1.5) (text logo:1.3), wildstyle 90 graffiti, thick lines, dripping oil based colors, " +
                                       $"black brick wall, urban city sidewalk, dim streetlight, at night, {description}";
                     settings = new Dictionary<string, string>
                                 {
@@ -366,10 +362,12 @@ namespace HartsyBot
                                     { "steps", "24" },
                                     { "CFG", "3.4" }
                                 };
+                    TemplateInfo = "This template celebrates wildstyle, a legendary form of Graffiti revered for it's " +
+                                    $"complexity and intricate design, by putting the spray can in YOUR hand.";
                     break;
 
-                case "Template12":
-                    templated = $"({text}:1.5) (text logo:1.3), dreamscape landscape, strange future, secret nature, chroma, " +
+                case "Dreamsmith":
+                    templated = $"(\"{text}\":1.5) (text logo:1.3), dreamscape landscape, strange future, secret nature, chroma, " +
                                       $"Surreal, ethereal, dreamy, mysterious, fantasy, highly detailed, {description}";
                     settings = new Dictionary<string, string>
                                 {
@@ -380,10 +378,11 @@ namespace HartsyBot
                                     { "steps", "24" },
                                     { "CFG", "3.4" }
                                 };
+                    TemplateInfo = "Use this template to bring to life enchanting worlds that are both tranquil and vibrant, invoking a sense of dreamy escapism.";
                     break;
 
-                case "Template13":
-                    templated = $"({text}:1.5) (text logo:1.3), comic book cover illustration, thick comic book title lettering " +
+                case "Comics":
+                    templated = $"(\"{text}\":1.5) (text logo:1.3), comic book cover illustration, thick comic book title lettering " +
                                       $"in an outer space scene, planet, moons orbiting, holographic meteors leave technicolor trails " +
                                       $"in the vast black emptiness of the universe, {description}";
                     settings = new Dictionary<string, string>
@@ -395,6 +394,21 @@ namespace HartsyBot
                                     { "steps", "24" },
                                     { "CFG", "3.4" }
                                 };
+                    TemplateInfo = "A template that brings comic book flair to the creation of outer space scenes, featuring detailed planets and glowing astral bodies.";
+                    break;
+
+                case "Diamond":
+                    templated = $"(\"{text}\":1.6) (text logo:1.3), bright, sparkling diamond encrusted letters, very expensive flashy, gold and silver jewelry items, " +
+                                $"glistening from the large diamonds {description}";
+                    settings = new Dictionary<string, string>
+                    {
+                                    { "lora", "Harrlogos" },
+                                    { "scheduler", "dpmpp se gpu" },
+                                    { "sampler", "Karras" },
+                                    { "steps", "35" },
+                                    { "CFG", "3.7" }
+                                };
+                    TemplateInfo = "Awaken your inner jeweler with Diamond Design! Encrust your text into high end gold and silver jewelry with beautiful sparking diamonds.";
                     break;
 
                 default:
@@ -415,10 +429,12 @@ namespace HartsyBot
                 .WithAuthor(Context.User)
                 .WithTitle("Your Hartsy.AI Generated Image")
                 .WithDescription($"Generating an image described by **{Context.User.Username}**\n" +
-                 $"**Prompt:** `{prompt}`\n\n" +
-                 "+-------Please wait while your image is being generated-------+\n\n")
+                 $"**Template:** \n`{TemplateInfo}`\n\n" +
+                 "**+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n"+
+                 "+-------Please wait while your image is being generated-------+\n\n"+
+                 "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++**++\n")
                 .WithColor(Color.DarkerGrey)
-                .WithFooter("CFG:4.5|Steps:35|Height:768|Width:1024")
+                .WithFooter("CFG:4.5 | Steps:35 | Height:768 | Width:1024")
                 .WithCurrentTimestamp()
                 .Build();
 
@@ -439,7 +455,7 @@ namespace HartsyBot
                     // Modify the message by grabbing the embed and generate a embedbuilder
                     var newMessage = await Context.Interaction.GetOriginalResponseAsync();
                     var updatedEmbed = newMessage.Embeds.First().ToEmbedBuilder();
-                    updatedEmbed.WithDescription($"Generated an image for **{Context.User.Username}**\n**Prompt:**`{prompt}`");
+                    updatedEmbed.WithDescription($"Generated an image for **{Context.User.Username}**\n**Template:**`{TemplateInfo}`");
                     updatedEmbed.WithColor(Color.Green);
                     updatedEmbed.WithImageUrl($"attachment://{filename}");
                     var fileAttachment = new FileAttachment(filePath);
