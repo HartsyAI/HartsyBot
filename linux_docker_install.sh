@@ -32,15 +32,15 @@ else
 fi
 
 # Navigate to the project directory
-cd .
+cd "$(dirname "$0")"
 
 # Build the Docker image
 echo "Building Docker image for HartsyBot..."
 docker build -t hartsybot .
 
-# Run the Docker container
+# Run the Docker container with the .env file
 echo "Running HartsyBot in Docker..."
-docker run -d --name hartsybot-instance hartsybot
+docker run -d --name hartsybot-instance --env-file ./.env hartsybot
 
 # Keep the window open
 echo "Press Enter to close this window..."

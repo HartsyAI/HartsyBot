@@ -20,11 +20,22 @@ namespace HartsyBot
 
         public async Task MainAsync()
         {
-            var envFilePath = Path.GetFullPath("../../../.env");
-            Console.WriteLine("Attempting to load .env file from: " + envFilePath);
+            // Try to get the bot token from environment variables
+            var token = Environment.GetEnvironmentVariable("BOT_TOKEN");
 
-            var envOptions = new DotEnvOptions(envFilePaths: new[] { envFilePath });
-            DotEnv.Load(envOptions);
+            // If token is not found in environment variables, load from .env file
+            if (string.IsNullOrEmpty(token))
+            {
+                var envFilePath = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "../../../.env"));
+                Console.WriteLine("Attempting to load .env file from: " + envFilePath);
+
+                if (File.Exists(envFilePath))
+                {
+                    var envOptions = new DotEnvOptions(envFilePaths: new[] { envFilePath });
+                    DotEnv.Load(envOptions);
+                    token = Environment.GetEnvironmentVariable("BOT_TOKEN");
+                }
+            }
 
             var config = new DiscordSocketConfig
             {
@@ -44,7 +55,7 @@ namespace HartsyBot
             var eventHandlers = new EventHandlers(_client, _interactions);
             eventHandlers.RegisterHandlers();
 
-            var token = Environment.GetEnvironmentVariable("BOT_TOKEN"); // Get the bot token from environment variables
+            //var token = Environment.GetEnvironmentVariable("BOT_TOKEN"); // Get the bot token from environment variables
             if (string.IsNullOrEmpty(token))
             {
                 Console.WriteLine("Bot token is null or empty. Check your .env file.");
