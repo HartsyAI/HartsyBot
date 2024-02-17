@@ -190,7 +190,7 @@ namespace HartsyBot.Core
             ] string template,
             [Summary("description", "Describe other aspects of the image.")] string description = null)
         {
-            await RespondAsync("Generating...", ephemeral: true);
+            await RespondAsync("Generating image, please wait...", ephemeral: true);
             // Get the channel and convert it to a SocketTextChannel
             var channel = Context.Channel as SocketTextChannel;
             var user = Context.User as SocketGuildUser;
@@ -433,23 +433,25 @@ namespace HartsyBot.Core
                 // Construct the prompt from the parameters
                 string prompt = templated;
                 var username = user.Username;
+                string projectRoot = Directory.GetParent(Environment.CurrentDirectory).Parent.Parent.FullName;
+                string waitImageFilePath = Path.Combine(projectRoot, "images", "wait.gif");
+
 
                 // Create a placeholder embed
                 var embed = new EmbedBuilder()
                     .WithAuthor(user)
                     .WithTitle("Thank you for generating your image with Hartsy.AI")
                     .WithDescription($"Generating an image described by **{username}**\n\n" +
-                     $"**Template Used:** {template}\n\n`{TemplateInfo}`\n\n" +
-                     "**+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n" +
-                     "+-------Please wait while your image is being generated-------+\n\n" +
-                     "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++**++\n")
+                     $"**Template Used:** {template}\n\n`{TemplateInfo}`\n\n")
                     .WithColor(Color.DarkerGrey)
                     .WithFooter("CFG:4.5 | Steps:35 | Height:768 | Width:1024")
                     .WithCurrentTimestamp()
+                    .WithImageUrl($"attachment://wait.gif")
                     .Build();
 
                 // Send the placeholder message
-                var previewMsg = await channel.SendMessageAsync(embed: embed);
+                //var previewMsg = await channel.SendMessageAsync(embed: embed);
+                var previewMsg = await channel.SendFileAsync(waitImageFilePath, "wait.gif", embed: embed);
 
                 // Generate the image
                 var base64Images = await StableSwarmAPI.GenerateImage(prompt);
