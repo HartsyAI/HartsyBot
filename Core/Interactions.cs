@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
+using HartsyBot.Core;
 
 namespace HartsyBot.Core
 {
@@ -103,5 +105,80 @@ namespace HartsyBot.Core
                 await RespondAsync("You have been given the 'Announcement' role!", ephemeral: true);
             }
         }
+
+        [ComponentInteraction("regenerate")]
+        public async Task RegenerateButtonHandler()
+        {
+            if (IsOnCooldown(Context.User, "regenerate"))
+            {
+                await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
+                return;
+            }
+            await RespondAsync("Regenerating...",ephemeral: true);
+            // run the GenerateFromTemplate Task
+            var interaction = Context.Interaction as SocketMessageComponent;
+            var message = interaction.Message;
+            // Get the first embed
+            var embed = message.Embeds.First();
+
+            // Embed description
+            string embedDescription = embed.Description;
+
+            // Regular expression patterns to extract text, description, and template
+            var textPattern = @"\*\*Text:\*\*\s*(.+?)\n\n";
+            var descriptionPattern = @"\*\*Extra Description:\*\*\s*(.+?)\n\n";
+            var templatePattern = @"\n\n\*\*Template Used:\*\*\s*(.+?)\n\n";
+
+            // Match and extract information using Regex
+            var textMatch = Regex.Match(embedDescription, textPattern);
+            var descriptionMatch = Regex.Match(embedDescription, descriptionPattern);
+            var templateMatch = Regex.Match(embedDescription, templatePattern);
+
+            // Extracted values
+            string text = textMatch.Groups[1].Value.Trim();
+            string description = descriptionMatch.Groups[1].Value.Trim();
+            string template = templateMatch.Groups[1].Value.Trim();
+
+            var channel = Context.Channel as SocketTextChannel;
+            var user = (SocketGuildUser)Context.User;
+            await Core.Commands.GenerateImages.GenerateFromTemplate(text, template, channel, user, description);
+            // TODO: Break up the generate_logo command into smaller functions so that we can call them here
+
+        }
+
+        [ComponentInteraction("delete")]
+        public async Task DeleteButtonHandler()
+        {
+            if (IsOnCooldown(Context.User, "delete"))
+            {
+                await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
+                return;
+            }
+
+            await DeferAsync(); // Defer the response
+
+            // Delete the original message
+            await (Context.Interaction as SocketMessageComponent)?.Message.DeleteAsync();
+
+            // Respond with a followup message
+            await FollowupAsync("Message deleted successfully", ephemeral: true);
+        }
+
+        [ComponentInteraction("showcase")]
+        public async Task ShowcaseButtonHandler()
+        {
+            if (IsOnCooldown(Context.User, "showcase"))
+            {
+                await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
+                return;
+            }
+            await RespondAsync("Showcasing...");
+
+            // TODO: Create the Showcase logic and call it here
+
+            // There should be a channel that the showcased image gets sent to and then the bot sends a message with the image
+            // The user can star the images they like and the bot will keep track of the stars
+        }
+
     }
 }
