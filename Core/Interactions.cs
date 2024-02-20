@@ -172,7 +172,7 @@ namespace HartsyBot.Core
                 await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
                 return;
             }
-            await RespondAsync("Showcasing...");
+            await RespondAsync("This feature has not been setup yet.");
 
             // TODO: Create the Showcase logic and call it here
 
