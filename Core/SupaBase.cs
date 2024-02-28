@@ -31,17 +31,34 @@ public class SupabaseClient
         await supabase.InitializeAsync();
     }
 
+    public async Task<List<Users>> GetAllUsers()
+    {
+        try
+        {
+            var response = await supabase.From<Users>().Get();
+            // If no exception is thrown, assume the call was successful
+            return response.Models ?? new List<Users>(); // Safely return the list, ensuring it's not null
+        }
+        catch (Exception ex)
+        {
+            // Log or handle exceptions here
+            Console.WriteLine($"Exception when fetching users: {ex.Message}");
+            return new List<Users>(); // Return an empty list in case of error
+        }
+    }
+
+
     [Table("users")]
     public class Users : BaseModel
     {
         [PrimaryKey("id", false)]
-        public int Id { get; set; }
+        public string Id { get; set; }
 
         [Column("full_name")]
         public string Name { get; set; }
 
         [Column("avatar_url")]
-        public int CountryId { get; set; }
+        public string Avatar_URL { get; set; }
 
         [Column("billing_address")]
         public string Billing { get; set; }
@@ -53,10 +70,10 @@ public class SupabaseClient
         public string Email { get; set; }
 
         [Column("username")]
-        public int Username { get; set; }
+        public string Username { get; set; }
 
         [Column("likes_count")]
-        public string Likes { get; set; }
+        public int Likes { get; set; }
 
         [Column("created_at")]
         public string Created { get; set; }
@@ -65,10 +82,10 @@ public class SupabaseClient
         public string Provider { get; set; }
 
         [Column("provider_id")]
-        public string ProviderId { get; set; }
+        public ulong ProviderId { get; set; }
 
         [Column("credit_limit")]   
-        public string Credit { get; set; }
+        public int Credit { get; set; }
 
         [Column("banner_url")]
         public string Banner { get; set; }
