@@ -16,6 +16,31 @@ namespace HartsyBot.Core
 {
     public class Commands : InteractionModuleBase<SocketInteractionContext>
     {
+        private readonly SupabaseClient _supabaseClient;
+
+        public Commands()
+        {
+            _supabaseClient = new SupabaseClient();
+        }
+
+        [SlashCommand("get_users", "Fetches all users from the database.")]
+        public async Task GetUsersCommand()
+        {
+            try
+            {
+                var users = await _supabaseClient.GetAllUsers();
+                var userDisplayStrings = users.Select(user => $"{user.Name} - {user.Email}").ToList();
+                string response = userDisplayStrings.Any() ? string.Join("\n", userDisplayStrings) : "No users found.";
+
+                // Respond with the list of users, sending the response as an ephemeral message
+                await RespondAsync(response, ephemeral: true);
+            }
+            catch (Exception ex)
+            {
+                // If something goes wrong, send an error message
+                await RespondAsync($"An error occurred: {ex.Message}", ephemeral: true);
+            }
+        }
         [SlashCommand("setup_rules", "Set up rules for the server.")]
         public async Task SetupRulesCommand()
         {
