@@ -1,7 +1,8 @@
-﻿using System.Threading.Tasks;
+﻿using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
-using Microsoft.VisualBasic;
+using Supabase;
+using Supabase.Interfaces;
 
 namespace HartsyBot.Core
 {
@@ -9,6 +10,7 @@ namespace HartsyBot.Core
     {
         private readonly DiscordSocketClient _client;
         private readonly InteractionService _interactions;
+        private readonly SupabaseClient _supabaseClient;
 
         public EventHandlers(DiscordSocketClient client, InteractionService interactions)
         {
@@ -34,6 +36,9 @@ namespace HartsyBot.Core
             // Find the welcome channel by its name
             var welcomeChannel = user.Guild.TextChannels.FirstOrDefault(x => x.Name == welcomeChannelName);
 
+            // Check if the user has linked their Discord account
+            bool isLinked = await _supabaseClient.IsDiscordLinked(user.Id.ToString());
+
             // Check if the welcome channel is found
             if (welcomeChannel != null)
             {
@@ -47,6 +52,11 @@ namespace HartsyBot.Core
 
                 // Send the image along with the welcome message
                 await welcomeChannel.SendFileAsync(stream, "welcome.png", welcomeMessage);
+            }
+            if (!isLinked)
+            {
+                // Send a direct message to the user
+                await user.SendMessageAsync(user.Mention + ", you have not linked your Discord account with your Hartsy.AI account. Please link your account to access the server.");
             }
         }
     }

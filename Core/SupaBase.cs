@@ -1,12 +1,14 @@
 ﻿using Postgrest.Attributes;
 using Postgrest.Models;
 using Supabase;
+using Supabase.Gotrue;
 using System;
 using System.Threading.Tasks;
+using static Postgrest.Constants;
 
 public class SupabaseClient
 {
-    private Client supabase;
+    private Supabase.Client supabase;
 
     public SupabaseClient()
     {
@@ -27,7 +29,7 @@ public class SupabaseClient
             AutoConnectRealtime = true
         };
 
-        var supabase = new Supabase.Client(url, key, options);
+        supabase = new Supabase.Client(url, key, options);
         await supabase.InitializeAsync();
     }
 
@@ -47,47 +49,70 @@ public class SupabaseClient
         }
     }
 
+    public async Task<bool> IsDiscordLinked(string discordId)
+    {
+        try
+        {
+            // Check if any user has the provided Discord ID
+            var result = await supabase
+                .From<Users>()
+                .Select("*") // Selects all fields; replace '*' with specific fields as needed
+                .Filter("provider_id", Operator.Equals, discordId)
+                .Get();
+
+            // If the response contains any users, it means the user's Discord ID is linked
+            bool isLinked = result.Models?.Count > 0;
+
+            return isLinked; // Return the result of the check
+        }
+        catch (Exception ex)
+        {
+            // Log or handle exceptions here
+            Console.WriteLine($"Exception when checking Discord link: {ex.Message}");
+            return false; // Return false in case of error
+        }
+    }
 
     [Table("users")]
     public class Users : BaseModel
     {
         [PrimaryKey("id", false)]
-        public string Id { get; set; }
+        public string? Id { get; set; }
 
         [Column("full_name")]
-        public string Name { get; set; }
+        public string? Name { get; set; }
 
         [Column("avatar_url")]
-        public string Avatar_URL { get; set; }
+        public string? Avatar_URL { get; set; }
 
         [Column("billing_address")]
-        public string Billing { get; set; }
+        public string? Billing { get; set; }
 
         [Column("payment_method")]
-        public string Payment { get; set; }
+        public string? Payment { get; set; }
 
         [Column("email")]
-        public string Email { get; set; }
+        public string? Email { get; set; }
 
         [Column("username")]
-        public string Username { get; set; }
+        public string? Username { get; set; }
 
         [Column("likes_count")]
-        public int Likes { get; set; }
+        public int? Likes { get; set; }
 
         [Column("created_at")]
-        public string Created { get; set; }
+        public string? Created { get; set; }
 
         [Column("provider")]
-        public string Provider { get; set; }
+        public string? Provider { get; set; }
 
         [Column("provider_id")]
-        public ulong ProviderId { get; set; }
+        public string? ProviderId { get; set; }
 
         [Column("credit_limit")]   
-        public int Credit { get; set; }
+        public int? Credit { get; set; }
 
         [Column("banner_url")]
-        public string Banner { get; set; }
+        public string? Banner { get; set; }
     }
 }

@@ -1,15 +1,6 @@
 ﻿using Discord.Interactions;
 using Discord.WebSocket;
-using System.Threading.Tasks;
 using Discord;
-using System.Linq;
-using System.Reflection.Metadata;
-using System.Net.Mail;
-using Microsoft.VisualBasic;
-using System.Threading.Channels;
-using System.Text.RegularExpressions;
-using Newtonsoft.Json.Linq;
-using System.ComponentModel;
 using Hartsy.Core;
 
 namespace HartsyBot.Core
@@ -17,10 +8,27 @@ namespace HartsyBot.Core
     public class Commands : InteractionModuleBase<SocketInteractionContext>
     {
         private readonly SupabaseClient _supabaseClient;
+        private readonly RunpodAPI _runpodAPI;
 
         public Commands()
         {
             _supabaseClient = new SupabaseClient();
+            _runpodAPI = new RunpodAPI();
+        }
+
+        [SlashCommand("runpod_test", "test generation from runpod")]
+        public async Task RunpodTestCommand()
+        {
+            try
+            {
+                var prompt = "A colorful, vibrant, and lively cityscape with a bustling street and towering skyscrapers";
+                var imageId = await _runpodAPI.CreateImageAsync(prompt);
+                await RespondAsync($"Image ID: {imageId}", ephemeral: true);
+            }
+            catch (Exception ex)
+            {
+                await RespondAsync($"An error occurred: {ex.Message}", ephemeral: true);
+            }
         }
 
         [SlashCommand("get_users", "Fetches all users from the database.")]
@@ -29,11 +37,13 @@ namespace HartsyBot.Core
             try
             {
                 var users = await _supabaseClient.GetAllUsers();
+                var isLinked = await _supabaseClient.IsDiscordLinked(Context.User.Id.ToString());
                 var userDisplayStrings = users.Select(user => $"{user.Name} - {user.Email}").ToList();
                 string response = userDisplayStrings.Any() ? string.Join("\n", userDisplayStrings) : "No users found.";
 
                 // Respond with the list of users, sending the response as an ephemeral message
                 await RespondAsync(response, ephemeral: true);
+                await FollowupAsync($"Is linked: {isLinked}", ephemeral: true);
             }
             catch (Exception ex)
             {
