@@ -13,12 +13,13 @@ namespace Hartsy.Core
         public RunpodAPI()
         {
             _httpClient = new HttpClient();
-            _apiKey = Environment.GetEnvironmentVariable("RUNPOD_KEY") ?? throw new InvalidOperationException("Runpod API key is not set in environment variables.");
+            //_apiKey = Environment.GetEnvironmentVariable("RUNPOD_KEY") ?? throw new InvalidOperationException("Runpod API key is not set in environment variables.");
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
             _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         }
 
-        public async Task<string> CreateImageAsync(string prompt, int numInferenceSteps = 25, int refinerInferenceSteps = 50, int width = 1024, int height = 1024, float guidanceScale = 7.5f, float strength = 0.3f, int numImages = 1)
+        public async Task<string> CreateImageAsync(string prompt, int numInferenceSteps = 25, int refinerInferenceSteps = 50, 
+            int width = 1024, int height = 1024, float guidanceScale = 7.5f, float strength = 0.3f, int numImages = 1)
         {
             var payload = new
             {

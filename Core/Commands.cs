@@ -51,6 +51,53 @@ namespace HartsyBot.Core
                 await RespondAsync($"An error occurred: {ex.Message}", ephemeral: true);
             }
         }
+
+        [SlashCommand("user_info", "Get information about the user.")]
+        public async Task UserInfoCommand(
+        [Summary("user", "The user to get information about.")] SocketGuildUser? targetUser = null)
+        {
+            try
+            {
+                var user = targetUser ?? (Context.User as SocketGuildUser);
+                if (targetUser != null && !user.Roles.Any(x => x.Name == "HARTSY Staff"))
+                {
+                    await RespondAsync("You must have the Hartsy Staff role to view other users' information.", ephemeral: true);
+                    return;
+                }
+
+                var userInfo = await _supabaseClient.GetUserByDiscordId(user.Id.ToString());
+                var subscriptionInfo = userInfo != null ? await _supabaseClient.GetSubscriptionByUserId(userInfo.Id ?? "0") : null;
+
+                if (userInfo != null)
+                {
+                    var embed = new EmbedBuilder()
+                        .WithTitle($"{userInfo.Username}'s Information")
+                        .WithThumbnailUrl(userInfo.Avatar_URL ?? user.GetAvatarUrl() ?? user.GetDefaultAvatarUrl())
+                        .AddField("Full Name", userInfo.Name ?? "N/A", true)
+                        .AddField("Email", userInfo.Email ?? "N/A", true)
+                        //.AddField("Subscription Level", subscriptionInfo != null ? subscriptionInfo.Status ?? "Active" : "No Subscription", true)
+                        .AddField("Credit Limit", userInfo.Credit?.ToString() ?? "N/A", true)
+                        .AddField("Likes", userInfo.Likes?.ToString() ?? "0", true);
+
+                    if (subscriptionInfo != null)
+                    {
+                        //embed.AddField("Subscription Status", subscriptionInfo.Status ?? "N/A", true);
+                    }
+
+                    embed.WithColor(Color.Blue);
+                    await RespondAsync(embed: embed.Build(), ephemeral: true);
+                }
+                else
+                {
+                    await RespondAsync("User information not found in the database.", ephemeral: true);
+                }
+            }
+            catch (Exception ex)
+            {
+                await RespondAsync($"An error occurred: {ex.Message}", ephemeral: true);
+            }
+        }
+
         [SlashCommand("setup_rules", "Set up rules for the server.")]
         public async Task SetupRulesCommand()
         {
