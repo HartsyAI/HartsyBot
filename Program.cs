@@ -1,12 +1,12 @@
-﻿using System;
-using System.Threading.Tasks;
-using Discord;
+﻿using Discord;
 using Discord.WebSocket;
 using Discord.Interactions;
 using dotenv.net;
-using dotenv.net.Utilities;
-using System.IO;
 using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using System;
+using Hartsy.Core;
+using HartsyBot.Core;
 
 namespace HartsyBot
 {
@@ -14,6 +14,8 @@ namespace HartsyBot
     {
         private DiscordSocketClient? _client;
         private InteractionService? _interactions;
+        private IServiceProvider? _serviceProvider;
+        private IServiceCollection? _services;
 
         public object? Context { get; private set; }
 
@@ -38,21 +40,23 @@ namespace HartsyBot
                 }
             }
 
-            var config = new DiscordSocketConfig
-            {
-                GatewayIntents = GatewayIntents.All,
-                LogLevel = LogSeverity.Debug
-            };
+            _serviceProvider = ConfigureServices();
+            _client = _serviceProvider.GetRequiredService<DiscordSocketClient>();
+            _interactions = _serviceProvider.GetRequiredService<InteractionService>();
 
-            _client = new DiscordSocketClient(config);
-            _interactions = new InteractionService(_client); // Initialize InteractionService
+            _client.InteractionCreated += async interaction =>
+            {
+                var ctx = new SocketInteractionContext(_client, interaction);
+                await _interactions.ExecuteCommandAsync(ctx, _serviceProvider);
+            };
 
             _client.Log += Log;
             _interactions.Log += Log;
-            _client.Ready += ReadyAsync;
+            _client.Ready += () => ReadyAsync(_serviceProvider);
 
             // Initialize and register event handlers
-            var eventHandlers = new Core.EventHandlers(_client, _interactions);
+            var supabaseClient = _serviceProvider.GetRequiredService<SupabaseClient>();
+            var eventHandlers = new Core.EventHandlers(_client, _interactions, supabaseClient);
             eventHandlers.RegisterHandlers();
 
             //var token = Environment.GetEnvironmentVariable("BOT_TOKEN"); // Get the bot token from environment variables
@@ -69,7 +73,24 @@ namespace HartsyBot
             await Task.Delay(-1);
         }
 
-        private async Task ReadyAsync()
+        private ServiceProvider ConfigureServices()
+        {
+            return new ServiceCollection()
+                .AddSingleton(new DiscordSocketClient(new DiscordSocketConfig
+                {
+                    GatewayIntents = GatewayIntents.All,
+                    LogLevel = LogSeverity.Debug
+                }))
+                .AddSingleton<InteractionService>()
+                .AddSingleton<InteractionHandlers>()
+                .AddSingleton<SupabaseClient>()
+                .AddSingleton<RunpodAPI>()
+                .AddSingleton<StableSwarmAPI>()
+                .AddSingleton<Showcase>()
+                .BuildServiceProvider();
+        }
+
+        private async Task ReadyAsync(IServiceProvider services)
         {
             try
             {
@@ -78,7 +99,7 @@ namespace HartsyBot
                 {
                     // Register command modules with the InteractionService.
                     // Tells  to scan the whole assembly for classes that define slash commands.
-                    await _interactions.AddModulesAsync(Assembly.GetEntryAssembly(), null);
+                    await _interactions.AddModulesAsync(Assembly.GetEntryAssembly(), _serviceProvider);
 
                     // DEBUG: Delete all global commands
                     //await _client.Rest.DeleteAllGlobalCommandsAsync();

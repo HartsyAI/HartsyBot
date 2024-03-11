@@ -12,20 +12,16 @@ namespace HartsyBot.Core
         private readonly InteractionService _interactions;
         private readonly SupabaseClient _supabaseClient;
 
-        public EventHandlers(DiscordSocketClient client, InteractionService interactions)
+        public EventHandlers(DiscordSocketClient client, InteractionService interactions, SupabaseClient supabaseClient)
         {
             _client = client;
             _interactions = interactions;
+            _supabaseClient = supabaseClient;
         }
 
         public void RegisterHandlers()
         {
             _client.UserJoined += OnUserJoinedAsync;
-            _client.InteractionCreated += async interaction =>
-            {
-                var ctx = new SocketInteractionContext(_client, interaction);
-                await _interactions.ExecuteCommandAsync(ctx, null);
-            };
         }
 
         private async Task OnUserJoinedAsync(SocketGuildUser user)

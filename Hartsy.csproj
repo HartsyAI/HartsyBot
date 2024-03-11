@@ -10,6 +10,7 @@
     <ItemGroup>
 	    <PackageReference Include="dotenv.net" Version="*" />
 	    <PackageReference Include="Discord.Net" Version="*" />
+	    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
 	    <PackageReference Include="supabase-csharp" Version="0.15.0" />
     </ItemGroup>
 

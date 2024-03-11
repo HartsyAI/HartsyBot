@@ -1,16 +1,23 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
+﻿using System.Text.RegularExpressions;
 using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
-using HartsyBot.Core;
+using Hartsy.Core;
 
 namespace HartsyBot.Core
 {
     public class InteractionHandlers : InteractionModuleBase<SocketInteractionContext>
     {
+
+        private readonly DiscordSocketClient _client;
+        private readonly Showcase _showcase;
+
+        public InteractionHandlers(DiscordSocketClient client, Showcase showcase)
+        {
+            _client = client;
+            _showcase = showcase;
+        }
+
         private static readonly Dictionary<(ulong, string), DateTime> _lastInteracted = [];
         private static readonly TimeSpan Cooldown = TimeSpan.FromSeconds(30); // 30 seconds cooldown
 
@@ -164,21 +171,72 @@ namespace HartsyBot.Core
             await FollowupAsync("Message deleted successfully", ephemeral: true);
         }
 
-        [ComponentInteraction("showcase")]
-        public async Task ShowcaseButtonHandler()
+        [ComponentInteraction("showcased")]
+        public async Task ShowcaseButtonHandler(string messageId)
         {
-            if (IsOnCooldown(Context.User, "showcase"))
+            Console.WriteLine("Handling showcase interaction."); // Log the beginning of the interaction
+            //await DeferAsync(); // Defer the response
+            try { await RespondAsync("Handling showcase interaction.", ephemeral: true); } catch { }
+            //await RespondAsync("Handling showcase interaction.", ephemeral: true); // Respond with a followup message
+            Console.WriteLine("Handling showcase interaction."); // Log the beginning of the interaction
+
+            var client = Context.Client as DiscordSocketClient;
+            if (client == null)
             {
-                await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
+                Console.WriteLine("Discord client not available."); // Log the client availability issue
+                await FollowupAsync("Error: Discord client not available.", ephemeral: true);
                 return;
             }
-            await RespondAsync("This feature has not been setup yet.");
 
-            // TODO: Create the Showcase logic and call it here
+            var originalMessage = await Context.Channel.GetMessageAsync(ulong.Parse(messageId)) as IUserMessage;
+            if (originalMessage == null)
+            {
+                Console.WriteLine("Original message not found."); // Log that the original message was not found
+                await FollowupAsync("Original message not found.", ephemeral: true);
+                return;
+            }
 
-            // There should be a channel that the showcased image gets sent to and then the bot sends a message with the image
-            // The user can star the images they like and the bot will keep track of the stars
+            var embed = originalMessage.Embeds.FirstOrDefault();
+            if (embed == null || string.IsNullOrEmpty(embed.Image?.Url))
+            {
+                Console.WriteLine("No image found in the original message."); // Log that no image was found
+                await FollowupAsync("No image found in the original message.", ephemeral: true);
+                return;
+            }
+
+            Console.WriteLine("Calling ShowcaseImageAsync."); // Log that we're calling the ShowcaseImageAsync method
+            await _showcase.ShowcaseImageAsync(Context.Guild, embed.Image.Value.Url, Context.User);
+            await FollowupAsync("Image added to the showcase!", ephemeral: true);
         }
 
+        // Update Upvote and Downvote Button Handlers to use Showcase service for processing votes
+        [ComponentInteraction("upvote")]
+        public async Task UpvoteButtonHandler(string messageId)
+        {
+            ulong msgId = Convert.ToUInt64(messageId);
+            var channel = Context.Channel;
+
+            await _showcase.UpdateVoteAsync(channel, msgId, Context.User, "upvote");
+            await RespondAsync("You upvoted this image!", ephemeral: true);
+        }
+
+        [ComponentInteraction("downvote")]
+        public async Task DownvoteButtonHandler(string messageId)
+        {
+            ulong msgId = Convert.ToUInt64(messageId);
+            var channel = Context.Channel;
+
+            await _showcase.UpdateVoteAsync(channel, msgId, Context.User, "downvote");
+            await RespondAsync("You downvoted this image!", ephemeral: true);
+        }
+
+        [ComponentInteraction("report")]
+        public async Task ReportButtonHandler(string messageId)
+        {
+            // Send a follow-up message to the user
+            await RespondAsync("Reported to admins.", ephemeral: true);
+
+            // TODO: Implement the actual reporting logic
+        }
     }
 }
