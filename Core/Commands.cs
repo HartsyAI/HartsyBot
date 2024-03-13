@@ -560,8 +560,9 @@ namespace HartsyBot.Core
 
                         var components = new ComponentBuilder()
                             .WithButton("Regenerate", "regenerate", ButtonStyle.Success)
-                            .WithButton("Add to Showcase", "showcase", ButtonStyle.Primary)
-                            .WithButton("Delete", "delete", ButtonStyle.Danger)
+                            .WithButton("Add to Showcase", "showcase:add", ButtonStyle.Primary)
+                            .WithButton("Report", "report:admin", ButtonStyle.Secondary, emote: new Emoji("\u26A0")) // ⚠
+                            .WithButton(" ", "delete", ButtonStyle.Danger, emote: new Emoji("\uD83D\uDDD1"))// 🗑
                             .Build();
 
                         // Update the original message with the new embed and attachment

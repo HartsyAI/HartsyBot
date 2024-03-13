@@ -171,14 +171,16 @@ namespace HartsyBot.Core
             await FollowupAsync("Message deleted successfully", ephemeral: true);
         }
 
-        [ComponentInteraction("showcased")]
-        public async Task ShowcaseButtonHandler(string messageId)
+        [ComponentInteraction("showcase:*")]
+        public async Task ShowcaseButtonHandler()
         {
+            if (IsOnCooldown(Context.User, "showcase"))
+            {
+                await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
+                return;
+            }
             Console.WriteLine("Handling showcase interaction."); // Log the beginning of the interaction
-            //await DeferAsync(); // Defer the response
-            try { await RespondAsync("Handling showcase interaction.", ephemeral: true); } catch { }
-            //await RespondAsync("Handling showcase interaction.", ephemeral: true); // Respond with a followup message
-            Console.WriteLine("Handling showcase interaction."); // Log the beginning of the interaction
+            await DeferAsync(); // Defer the response
 
             var client = Context.Client as DiscordSocketClient;
             if (client == null)
@@ -188,7 +190,10 @@ namespace HartsyBot.Core
                 return;
             }
 
-            var originalMessage = await Context.Channel.GetMessageAsync(ulong.Parse(messageId)) as IUserMessage;
+            //var originalMessage = await Context.Channel.GetMessageAsync(numericMessageId) as IUserMessage;
+            //var originalMessage = await Context.Channel.GetMessageAsync(Context.Interaction.Id) as IUserMessage;
+            var originalMessage = (Context.Interaction as SocketMessageComponent)?.Message as IUserMessage;
+
             if (originalMessage == null)
             {
                 Console.WriteLine("Original message not found."); // Log that the original message was not found
@@ -209,32 +214,47 @@ namespace HartsyBot.Core
             await FollowupAsync("Image added to the showcase!", ephemeral: true);
         }
 
-        // Update Upvote and Downvote Button Handlers to use Showcase service for processing votes
-        [ComponentInteraction("upvote")]
-        public async Task UpvoteButtonHandler(string messageId)
+        [ComponentInteraction("vote:*")]
+        public async Task VoteButtonHandler(string customId)
         {
-            ulong msgId = Convert.ToUInt64(messageId);
+            if (IsOnCooldown(Context.User, "vote"))
+            {
+                await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
+                return;
+            }
             var channel = Context.Channel;
+            var messageId = (Context.Interaction as SocketMessageComponent).Message.Id;
 
-            await _showcase.UpdateVoteAsync(channel, msgId, Context.User, "upvote");
-            await RespondAsync("You upvoted this image!", ephemeral: true);
+            switch (customId)
+            {
+                case "up":
+                    await _showcase.UpdateVoteAsync(channel, messageId, Context.User, "upvote");
+                    await RespondAsync("You upvoted this image!", ephemeral: true);
+                    break;
+                case "down":
+                    await _showcase.UpdateVoteAsync(channel, messageId, Context.User, "downvote");
+                    await RespondAsync("You downvoted this image!", ephemeral: true);
+                    break;
+                default:
+                    await RespondAsync("Invalid vote.", ephemeral: true);
+                    break;
+            }
         }
 
-        [ComponentInteraction("downvote")]
-        public async Task DownvoteButtonHandler(string messageId)
+        [ComponentInteraction("report:*")]
+        public async Task ReportButtonHandler()
         {
-            ulong msgId = Convert.ToUInt64(messageId);
-            var channel = Context.Channel;
+            if (IsOnCooldown(Context.User, "report"))
+            {
+                await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
+                return;
+            }
+            // disable button so it cannot be reported twice
+            await DeferAsync();
+            // disable the button
 
-            await _showcase.UpdateVoteAsync(channel, msgId, Context.User, "downvote");
-            await RespondAsync("You downvoted this image!", ephemeral: true);
-        }
-
-        [ComponentInteraction("report")]
-        public async Task ReportButtonHandler(string messageId)
-        {
             // Send a follow-up message to the user
-            await RespondAsync("Reported to admins.", ephemeral: true);
+            await FollowupAsync("Reported to admins.", ephemeral: true);
 
             // TODO: Implement the actual reporting logic
         }
