@@ -39,9 +39,9 @@ namespace HartsyBot.Core
                 var embed = new EmbedBuilder()
                     .WithTitle("Hartsy.AI Bot Help")
                     .WithThumbnailUrl(Context.Guild.IconUrl)
-                    .WithDescription("Hartsy.AI is the premier Stable Diffusion platform for generating images directly in Discord. \n\nOur custom Discord bot enables users to generate images with text using our fine-tuned templates, choose your favorite images to send to #showcase for community voting, and potentially get featured weekly on the server. \n\nDiscover more and subscribe at: https://hartsy.ai/subs")
+                    .WithDescription("Hartsy.AI is the premier Stable Diffusion platform for generating images with text directly in Discord. \n\nOur custom Discord bot enables users to generate images with text using our fine-tuned templates, choose your favorite images to send to #showcase for community voting, and potentially get featured weekly on the server. \n\nDiscover more and subscribe at: https://hartsy.ai/subs")
                     .AddField("Available Slash Commands", "Checked the pinned messages for a more detailed explanation of these commands.", false)
-                    .AddField("/generate_logo", "Generate an image based on the text you provide, select a template, and optionally add extra prompt information. Example: `/generate_logo text:\"Your Text\" template:\"Template Name\" additions:\"Extra Prompt\"`", false)
+                    .AddField("/generate", "Generate an image based on the text you provide, select a template, and optionally add extra prompt information. Example: `/generate_logo text:\"Your Text\" template:\"Template Name\" additions:\"Extra Prompt\"`", false)
                     .AddField("/user_info", "Check the status of your subscription and see how many tokens you have left for image generation. Example: `/user_info`", false)
                     .AddField("/help", "Shows this help message. Example: `/help`", false)
                     .WithColor(Color.Blue)
@@ -257,7 +257,7 @@ namespace HartsyBot.Core
             }
         }
 
-        [SlashCommand("logo_generator", "Generate an image from a prompt")]
+        [SlashCommand("generate", "Generate an image from a prompt")]
         public async Task ImageGenerationCommand(
             [Summary("text", "The text you want to appear in the image.")] string text,
             [Summary("template", "Choose a template for the image.")]
@@ -276,7 +276,7 @@ namespace HartsyBot.Core
                 Choice("Cosmic Comics", "Comics"),
                 Choice("Diamond Design", "Diamond")
             ] string template,
-            [Summary("description", "Describe other aspects of the image.")] string description = null)
+            [Summary("additional_details", "Describe other aspects to add to the prompt.")] string description = null)
         {
             await RespondAsync("Generating image, please wait...", ephemeral: true);
             // Get the channel and convert it to a SocketTextChannel
