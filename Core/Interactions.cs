@@ -88,6 +88,8 @@ namespace HartsyBot.Core
             }
 
             await RespondAsync(response, ephemeral: true);
+
+            // TODO: Add a check if the user has linked their discord account with their Hartsy.AI account and if they are a subscriber
         }
 
 
@@ -162,6 +164,8 @@ namespace HartsyBot.Core
                 return;
             }
 
+            // TODO: Make it so only the user who sent the message can delete it
+
             await DeferAsync(); // Defer the response
 
             // Delete the original message
@@ -179,6 +183,9 @@ namespace HartsyBot.Core
                 await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
                 return;
             }
+
+            // TODO: Make it so only the user who sent the message can showcase it
+
             Console.WriteLine("Handling showcase interaction."); // Log the beginning of the interaction
             await DeferAsync(); // Defer the response
 
@@ -249,7 +256,7 @@ namespace HartsyBot.Core
                 await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
                 return;
             }
-            // disable button so it cannot be reported twice
+            // TODO: disable button so it cannot be reported twice
             await DeferAsync();
             // disable the button
 

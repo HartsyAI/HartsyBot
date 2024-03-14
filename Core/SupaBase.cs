@@ -151,6 +151,8 @@ public class SupabaseClient
         }
     }
 
+    // TODO: add method to parse templates. This method should return a dict of templates with settings. 
+
 
     [Table("users")]
     public class Users : BaseModel

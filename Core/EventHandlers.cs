@@ -49,6 +49,7 @@ namespace HartsyBot.Core
                 // Send the image along with the welcome message
                 await welcomeChannel.SendFileAsync(stream, "welcome.png", welcomeMessage);
             }
+            // TODO: Add an embed to send the user and add fields if linked or not.
             if (!isLinked)
             {
                 // Send a direct message to the user
@@ -58,6 +59,10 @@ namespace HartsyBot.Core
             {
                 // Send a direct message to the user
                 await user.SendMessageAsync(user.Mention + ", welcome to the **Hartsy.AI** Discord Server! Check out the #rules channel.");
+                var sub_status = await _supabaseClient.GetSubStatus(user.Id.ToString());
+
+                // TODO: if they have a valid sub status, send them a message about it
+                // Add a role to the user depending on what their subscription status is
             }
         }
     }
