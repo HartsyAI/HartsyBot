@@ -54,6 +54,11 @@ namespace HartsyBot.Core
                 // Send a direct message to the user
                 await user.SendMessageAsync(user.Mention + ", you have not linked your Discord account with your Hartsy.AI account. Please link your account to access the server.");
             }
+            else
+            {
+                // Send a direct message to the user
+                await user.SendMessageAsync(user.Mention + ", welcome to the **Hartsy.AI** Discord Server! Check out the #rules channel.");
+            }
         }
     }
 

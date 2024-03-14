@@ -20,7 +20,7 @@ public class SupabaseClient
     private async Task InitializeSupabase()
     {
         var url = Environment.GetEnvironmentVariable("SUPABASE_URL");
-        var key = Environment.GetEnvironmentVariable("SUPABASE_KEY");
+        var key = Environment.GetEnvironmentVariable("SUPABASE_SERVICE_KEY");
         if (string.IsNullOrEmpty(url) || string.IsNullOrEmpty(key))
         {
             throw new InvalidOperationException("Supabase URL or KEY is not set in the environment variables.");
@@ -85,6 +85,33 @@ public class SupabaseClient
         return response;
     }
 
+    public async Task<Dictionary<string, object>?> GetSubStatus(string discordId)
+    {
+        try
+        {
+            var user = await GetUserByDiscordId(discordId);
+            if (user == null)
+            {
+                Console.WriteLine("User not found.");
+                return null;
+            }
+
+            var subStatus = new Dictionary<string, object>
+        {
+            {"PlanName", user.PlanName ?? "No plan"},
+            {"Credits", user.Credit ?? 0},
+            // Add any other subscription info here
+        };
+
+            return subStatus;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching subscription status: {ex.Message}");
+            return null;
+        }
+    }
+
     public async Task<Subscriptions?> GetSubscriptionByUserId(string userId)
     {
         try
@@ -92,23 +119,24 @@ public class SupabaseClient
             Console.WriteLine("\nAttempting to fetch subscription for user ID: " + userId + "\n");
 
             // Query to get subscription data for a specific user ID
-            var response = await supabase.From<Subscriptions>().Get();
-            //.Select("*")
-            //.Filter("user_id", Operator.Equals, userId)
-            //.Filter("price_id", Operator.Equals, price_id)
-            //.Single();
+            var response = await supabase.From<Subscriptions>()
+            .Select("*")
+            .Filter("user_id", Operator.Equals, userId)
+            .Single();
 
-            Console.WriteLine($"Subscriptions Table # of Columns: {response.Models.Count}");
+            //Console.WriteLine($"Subscriptions Table # of Rows: {response.Models.Count}");
             var templates = await supabase.From<Template>().Get();
-            Console.WriteLine($"Templates Table # of Columns: {templates.Models.Count}");
+            Console.WriteLine($"Templates Table # of Rows: {templates.Models.Count}");
             var prices = await supabase.From<Prices>().Get();
-            Console.WriteLine($"Prices Table # of Columns: {prices.Models.Count}");
+            Console.WriteLine($"Prices Table # of Rows: {prices.Models.Count}");
+            var images = await supabase.From<Images>().Get();
+            Console.WriteLine($"Images Table # of Rows: {images.Models.Count}");
+            var generations = await supabase.From<Generations>().Get();
+            Console.WriteLine($"Generations Table # of Rows: {generations.Models.Count}");
 
             if (response != null)
             {
-                Console.WriteLine("Subscription found for user ID: " + userId);
-                Console.WriteLine($"Sub  table response: {response}");
-                return response.Model;
+                return response;
             }
             else
             {
@@ -165,6 +193,17 @@ public class SupabaseClient
 
         [Column("banner_url")]
         public string? Banner { get; set; }
+
+        [Column("stripe_customer_id")]
+        public string? StripeId { get; set; }
+
+        [Column("gallery_size")]
+        public int? Gallery { get; set; }
+
+        [Column("plan_name")]
+        public string? PlanName { get; set; }
+
+
     }
 
     [Table("subscriptions")]
@@ -173,69 +212,69 @@ public class SupabaseClient
         [PrimaryKey("id", false)]
         public string? Id { get; set; }
 
-        //[Column("user_id")]
-        //public string? UserId { get; set; }
+        [Column("user_id")]
+        public string? UserId { get; set; }
 
-        //[Column("status")]
-        //public string? Status { get; set; }
+        [Column("status")]
+        public string? Status { get; set; }
 
-        //[Column("metadata")]
-        //public string? MetadataJson { get; set; } // Keeping as string but changing the name for clarity
+        [Column("metadata")]
+        public string? MetadataJson { get; set; } // Keeping as string but changing the name for clarity
 
-        //// Not stored in DB, just a convenient way to access the parsed metadata
-        //[JsonIgnore] // Make sure this isn't attempted to be mapped by your ORM
-        //public Dictionary<string, object>? Metadata
-        //{
-        //    get
-        //    {
-        //        if (string.IsNullOrEmpty(MetadataJson)) return null;
-        //        try
-        //        {
-        //            return JsonSerializer.Deserialize<Dictionary<string, object>>(MetadataJson);
-        //        }
-        //        catch (JsonException)
-        //        {
-        //            Console.WriteLine("Failed to parse JSON from metadata.");
-        //            return null;
-        //        }
-        //    }
-        //}
+        // Not stored in DB, just a convenient way to access the parsed metadata
+        [JsonIgnore] // Make sure this isn't attempted to be mapped by your ORM
+        public Dictionary<string, object>? Metadata
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(MetadataJson)) return null;
+                try
+                {
+                    return JsonSerializer.Deserialize<Dictionary<string, object>>(MetadataJson);
+                }
+                catch (JsonException)
+                {
+                    Console.WriteLine("Failed to parse JSON from metadata.");
+                    return null;
+                }
+            }
+        }
 
-        //[Column("price_id")]
-        //public string? PriceId { get; set; }
+        [Column("price_id")]
+        public string? PriceId { get; set; }
 
-        //[Column("quantity")]
-        //public int? Quantity { get; set; }
+        [Column("quantity")]
+        public int? Quantity { get; set; }
 
-        //[Column("cancel_at_period_end")]
-        //public bool? CancelAtPeriodEnd { get; set; }
+        [Column("cancel_at_period_end")]
+        public bool? CancelAtPeriodEnd { get; set; }
 
-        //[Column("created")]
-        //public DateTime? Created { get; set; }
+        [Column("created")]
+        public DateTime? Created { get; set; }
 
-        //[Column("current_period_start")]
-        //public DateTime? CurrentPeriodStart { get; set; }
+        [Column("current_period_start")]
+        public DateTime? CurrentPeriodStart { get; set; }
 
-        //[Column("current_period_end")]
-        //public DateTime? CurrentPeriodEnd { get; set; }
+        [Column("current_period_end")]
+        public DateTime? CurrentPeriodEnd { get; set; }
 
-        //[Column("ended_at")]
-        //public DateTime? EndedAt { get; set; }
+        [Column("ended_at")]
+        public DateTime? EndedAt { get; set; }
 
-        //[Column("cancel_at")]
-        //public DateTime? CancelAt { get; set; }
+        [Column("cancel_at")]
+        public DateTime? CancelAt { get; set; }
 
-        //[Column("canceled_at")]
-        //public DateTime? CanceledAt { get; set; }
+        [Column("canceled_at")]
+        public DateTime? CanceledAt { get; set; }
 
-        //[Column("trial_start")]
-        //public DateTime? TrialStart { get; set; }
+        [Column("trial_start")]
+        public DateTime? TrialStart { get; set; }
 
-        //[Column("trial_end")]
-        //public DateTime? TrialEnd { get; set; }
+        [Column("trial_end")]
+        public DateTime? TrialEnd { get; set; }
 
-        //[Column("amount")]
-        //public int? Amount { get; set; }
+        [Column("amount")]
+        public int? Amount { get; set; }
     }
 
 
@@ -326,6 +365,80 @@ public class SupabaseClient
 
         [Column("is_topup")]
         public bool IsTopup { get; set; }
+    }
+
+    [Table("images")]
+    public class Images : BaseModel
+    {
+        [PrimaryKey("id", false)]
+        public long Id { get; set; }
+
+        [Column("user_id")]
+        public Guid UserId { get; set; }
+
+        [Column("generation_id")]
+        public long GenerationId { get; set; }
+
+        [Column("image_url")]
+        public string ImageUrl { get; set; }
+
+        [Column("created_at")]
+        public DateTime CreatedAt { get; set; }
+
+        [Column("likes_count")]
+        public long LikesCount { get; set; }
+
+        //[Column("template_id")]
+        //public long TemplateId { get; set; }
+
+        [Column("is_public")]
+        public bool IsPublic { get; set; }
+    }
+
+    [Table("generations")]
+    public class Generations : BaseModel
+    {
+        [PrimaryKey("id", false)]
+        public long Id { get; set; }
+
+        [Column("user_id")]
+        public Guid UserId { get; set; }
+
+        [Column("batch")]
+        public short Batch { get; set; }
+
+        //[Column("duration")]
+        //public long Duration { get; set; }
+
+        [Column("positive")]
+        public string Positive { get; set; }
+
+        [Column("negative")]
+        public string Negative { get; set; }
+
+        [Column("checkpoint")]
+        public string Checkpoint { get; set; }
+
+        [Column("created_at")]
+        public DateTime CreatedAt { get; set; }
+
+        [Column("comfy_endpoint")]
+        public string ComfyEndpoint { get; set; }
+
+        [Column("comfy_prompt_id")]
+        public string ComfyPromptId { get; set; }
+
+        [Column("width")]
+        public long Width { get; set; }
+
+        [Column("height")]
+        public long Height { get; set; }
+
+        //[Column("template_id")]
+        //public long TemplateId { get; set; }
+
+        [Column("status")]
+        public string Status { get; set; }
     }
 
 }

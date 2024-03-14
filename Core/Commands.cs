@@ -31,19 +31,24 @@ namespace HartsyBot.Core
             }
         }
 
-        [SlashCommand("get_users", "Fetches all users from the database.")]
-        public async Task GetUsersCommand()
+        [SlashCommand("help", "Learn how to use the bot")]
+        public async Task HelpCommand()
         {
             try
             {
-                var users = await _supabaseClient.GetAllUsers();
-                var isLinked = await _supabaseClient.IsDiscordLinked(Context.User.Id.ToString());
-                var userDisplayStrings = users.Select(user => $"{user.Name} - {user.Email}").ToList();
-                string response = userDisplayStrings.Any() ? string.Join("\n", userDisplayStrings) : "No users found.";
+                var embed = new EmbedBuilder()
+                    .WithTitle("Hartsy.AI Bot Help")
+                    .WithThumbnailUrl(Context.Guild.IconUrl)
+                    .WithDescription("Hartsy.AI is the premier Stable Diffusion platform for generating images directly in Discord. \n\nOur custom Discord bot enables users to generate images with text using our fine-tuned templates, choose your favorite images to send to #showcase for community voting, and potentially get featured weekly on the server. \n\nDiscover more and subscribe at: https://hartsy.ai/subs")
+                    .AddField("Available Slash Commands", "Checked the pinned messages for a more detailed explanation of these commands.", false)
+                    .AddField("/generate_logo", "Generate an image based on the text you provide, select a template, and optionally add extra prompt information. Example: `/generate_logo text:\"Your Text\" template:\"Template Name\" additions:\"Extra Prompt\"`", false)
+                    .AddField("/user_info", "Check the status of your subscription and see how many tokens you have left for image generation. Example: `/user_info`", false)
+                    .AddField("/help", "Shows this help message. Example: `/help`", false)
+                    .WithColor(Color.Blue)
+                    .WithFooter(footer => footer.Text = "For more information, visit Hartsy.AI")
+                    .WithCurrentTimestamp();
 
-                // Respond with the list of users, sending the response as an ephemeral message
-                await RespondAsync(response, ephemeral: true);
-                await FollowupAsync($"Is linked: {isLinked}", ephemeral: true);
+                await RespondAsync(embed: embed.Build());
             }
             catch (Exception ex)
             {
@@ -51,6 +56,7 @@ namespace HartsyBot.Core
                 await RespondAsync($"An error occurred: {ex.Message}", ephemeral: true);
             }
         }
+
 
         [SlashCommand("user_info", "Get information about the user.")]
         public async Task UserInfoCommand(
@@ -61,7 +67,7 @@ namespace HartsyBot.Core
                 var user = targetUser ?? (Context.User as SocketGuildUser);
                 if (targetUser != null && !user.Roles.Any(x => x.Name == "HARTSY Staff"))
                 {
-                    await RespondAsync("You must have the Hartsy Staff role to view other users' information.", ephemeral: true);
+                    await RespondAsync("Only admins are allowed to specify a user. Just run the command without specifying a user and it will automatically show your info.", ephemeral: true);
                     return;
                 }
 
@@ -75,13 +81,13 @@ namespace HartsyBot.Core
                         .WithThumbnailUrl(userInfo.Avatar_URL ?? user.GetAvatarUrl() ?? user.GetDefaultAvatarUrl())
                         .AddField("Full Name", userInfo.Name ?? "N/A", true)
                         .AddField("Email", userInfo.Email ?? "N/A", true)
-                        //.AddField("Subscription Level", subscriptionInfo != null ? subscriptionInfo.Status ?? "Active" : "No Subscription", true)
+                        .AddField("Subscription Level", subscriptionInfo != null ? subscriptionInfo.Status ?? "Active" : "No Subscription", true)
                         .AddField("Credit Limit", userInfo.Credit?.ToString() ?? "N/A", true)
                         .AddField("Likes", userInfo.Likes?.ToString() ?? "0", true);
 
                     if (subscriptionInfo != null)
                     {
-                        //embed.AddField("Subscription Status", subscriptionInfo.Status ?? "N/A", true);
+                        embed.AddField("Subscription Status", subscriptionInfo.Status ?? "N/A", true);
                     }
 
                     embed.WithColor(Color.Blue);
