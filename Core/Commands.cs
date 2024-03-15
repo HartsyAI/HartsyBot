@@ -265,20 +265,7 @@ namespace HartsyBot.Core
         public async Task ImageGenerationCommand(
             [Summary("text", "The text you want to appear in the image.")] string text,
             [Summary("template", "Choose a template for the image.")]
-            [Choice("Rainbow Flow", "Rainbow Flow"),
-                Choice("Phantom Grove", "Phantom Grove"),
-                Choice("Shroominous", "Shroominous"),
-                Choice("Quantum Canvas", "Quantum Canvas"),
-                Choice("Appster", "Appster"),
-                Choice("Brandtastic", "Brandtastic"),
-                Choice("Pixel Playground", "Pixel Playground"),
-                Choice("Speaking Sushi", "Speaking Sushi"),
-                Choice("Unholy Textament", "UnholyTextament"),
-                Choice("Words of Wildstyle", "Words of Wildstyle"),
-                Choice("Dreamsmith", "Dreamsmith"),
-                Choice("Cosmic Comics", "Cosmic Comic"),
-                Choice("Neon Nights", "Neon Nights")
-            ] string template,
+            [Autocomplete(typeof(TemplateAutocompleteHandler))] string template,
             [Summary("additional_details", "Describe other aspects to add to the prompt.")] string description = null)
         {
             await RespondAsync("Generating image, please wait...", ephemeral: true);
