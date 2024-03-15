@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using static Postgrest.Constants;
 using System.Text.Json.Serialization;
 using System.Text.Json;
+using static SupabaseClient;
 
 public class SupabaseClient
 {
@@ -189,7 +190,51 @@ public class SupabaseClient
         }
     }
 
+    public async Task AddGenerationAsync(string discordId)
+    {
+        try
+        { 
+            var url = Environment.GetEnvironmentVariable("RUNPOD_URL");
+            var user = await GetUserByDiscordId(discordId);
+            if (user == null)
+            {
+                Console.WriteLine("User not found.");
+            }
+            var userId = user.Id;
+            var newGeneration = new Generations
+            {
+                Id = 1000,
+                UserId = userId,
+                Batch = 1,
+                //Duration = 1000,
+                Positive = "Example of positive prompt",
+                Negative = "Example of negative aspects",
+                Checkpoint = "StarlightXL.safetensors",
+                CreatedAt = DateTime.UtcNow,
+                ComfyEndpoint = url,
+                ComfyPromptId = "e639da24-6ce1-46df-93b0-c5f20fe79c3b",
+                Width = 1024,
+                Height = 768,
+                //TemplateId = 123,
+                Status = "queued"
+            };
 
+            var response = await supabase.From<Generations>().Insert(newGeneration);
+
+            if (response == null)
+            {
+                Console.WriteLine($"Error inserting new generation: {response.ResponseMessage}");
+            }
+            else
+            {
+                Console.WriteLine("New generation row added successfully.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error adding generation: {ex.Message}");
+        }
+    }
 
     // TODO: add method to parse templates. This method should return a dict of templates with settings. 
 
@@ -444,7 +489,7 @@ public class SupabaseClient
         public long Id { get; set; }
 
         [Column("user_id")]
-        public Guid UserId { get; set; }
+        public string? UserId { get; set; }
 
         [Column("batch")]
         public short Batch { get; set; }
@@ -453,22 +498,22 @@ public class SupabaseClient
         //public long Duration { get; set; }
 
         [Column("positive")]
-        public string Positive { get; set; }
+        public string? Positive { get; set; }
 
         [Column("negative")]
-        public string Negative { get; set; }
+        public string? Negative { get; set; }
 
         [Column("checkpoint")]
-        public string Checkpoint { get; set; }
+        public string? Checkpoint { get; set; }
 
         [Column("created_at")]
         public DateTime CreatedAt { get; set; }
 
         [Column("comfy_endpoint")]
-        public string ComfyEndpoint { get; set; }
+        public string? ComfyEndpoint { get; set; }
 
         [Column("comfy_prompt_id")]
-        public string ComfyPromptId { get; set; }
+        public string? ComfyPromptId { get; set; }
 
         [Column("width")]
         public long Width { get; set; }
@@ -480,7 +525,7 @@ public class SupabaseClient
         //public long TemplateId { get; set; }
 
         [Column("status")]
-        public string Status { get; set; }
+        public string? Status { get; set; }
     }
 
 }

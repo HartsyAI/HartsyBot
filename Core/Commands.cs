@@ -25,10 +25,9 @@ namespace HartsyBot.Core
         {
             try
             {
-                ulong userId = Context.User.Id;
-                var prompt = "A colorful, vibrant, and lively cityscape with a bustling street and towering skyscrapers";
-                var imageId = await _runpodAPI.CreateImageAsync(userId, prompt, "malformed letters, repeating letters, double letters", "checkpoint", 1, 1024, 1024);
-                await RespondAsync($"Image ID: {imageId}", ephemeral: true);
+                string userId = Context.User.Id.ToString();
+                _supabaseClient.AddGenerationAsync(userId);
+                await RespondAsync("Testing, please wait...", ephemeral: true);
             }
             catch (Exception ex)
             {
@@ -273,7 +272,7 @@ namespace HartsyBot.Core
                 Choice("Appster", "Appster"),
                 Choice("Brandtastic", "Brandtastic"),
                 Choice("Pixel Playground", "Pixel Playground"),
-                Choice("Speaking Sushi ", "Speaking Sushi"),
+                Choice("Speaking Sushi", "Speaking Sushi"),
                 Choice("Unholy Textament", "UnholyTextament"),
                 Choice("Words of Wildstyle", "Words of Wildstyle"),
                 Choice("Dreamsmith", "Dreamsmith"),
