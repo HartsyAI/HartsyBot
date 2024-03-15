@@ -87,6 +87,7 @@ namespace HartsyBot
                 .AddSingleton<RunpodAPI>()
                 .AddSingleton<StableSwarmAPI>()
                 .AddSingleton<Showcase>()
+                .AddSingleton<Commands>()
                 .BuildServiceProvider();
         }
 

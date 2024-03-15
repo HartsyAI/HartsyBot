@@ -13,34 +13,27 @@ namespace Hartsy.Core
         public RunpodAPI()
         {
             _httpClient = new HttpClient();
-            //_apiKey = Environment.GetEnvironmentVariable("RUNPOD_KEY") ?? throw new InvalidOperationException("Runpod API key is not set in environment variables.");
-            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
-            _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+            _apiKey = Environment.GetEnvironmentVariable("RUNPOD_KEY") ?? throw new InvalidOperationException("Runpod API key is not set in environment variables.");
         }
 
-        public async Task<string> CreateImageAsync(string prompt, int numInferenceSteps = 25, int refinerInferenceSteps = 50, 
-            int width = 1024, int height = 1024, float guidanceScale = 7.5f, float strength = 0.3f, int numImages = 1)
+        public async Task<string> CreateImageAsync(ulong discordId, string positive, string negative, string checkpoint, int batch = 1, int width = 1024, int height = 1024)
         {
             var payload = new
             {
-                input = new
-                {
-                    prompt,
-                    num_inference_steps = numInferenceSteps,
-                    refiner_inference_steps = refinerInferenceSteps,
-                    width,
-                    height,
-                    guidance_scale = guidanceScale,
-                    strength,
-                    seed = (int?)null,
-                    num_images = numImages
-                }
+                batch,
+                positive,
+                negative,
+                checkpoint,
+                width,
+                height,
             };
 
-            string requestUri = $"{_baseUrl}/sdxl/runsync";
+            string requestUri = $"{_baseUrl}";
 
             try
             {
+                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+
                 string jsonPayload = JsonSerializer.Serialize(payload);
                 var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
                 var response = await _httpClient.PostAsync(requestUri, content);

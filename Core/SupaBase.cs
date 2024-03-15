@@ -134,6 +134,18 @@ public class SupabaseClient
             var generations = await supabase.From<Generations>().Get();
             Console.WriteLine($"Generations Table # of Rows: {generations.Models.Count}");
 
+            var getTemplates = await GetTemplatesAsync();
+            foreach (var template in getTemplates.Values)
+            {
+                Console.WriteLine($"Template Name: {template.Name}");
+                Console.WriteLine($"Positive: {template.Positive}");
+                Console.WriteLine($"Negative: {template.Negative}");
+                Console.WriteLine($"Checkpoint: {template.Checkpoint}");
+                Console.WriteLine($"Seed: {template.Seed}");
+                Console.WriteLine($"Description: {template.Description}");
+                Console.WriteLine("-------------------------------");
+            }
+
             if (response != null)
             {
                 return response;
@@ -150,6 +162,34 @@ public class SupabaseClient
             return null; // Return null in case of error
         }
     }
+
+    public async Task<Dictionary<string, Template>?> GetTemplatesAsync()
+    {
+        try
+        {
+            var response = await supabase.From<Template>().Select("*").Get();
+
+            // Ensure we have models to work with
+            if (response.Models != null && response.Models.Any())
+            {
+                // Convert the list of templates to a dictionary
+                var templatesDictionary = response.Models.ToDictionary(template => template.Name, template => template);
+                return templatesDictionary;
+            }
+            else
+            {
+                Console.WriteLine("No templates found.");
+                return null;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error in GetTemplates: {ex.Message}");
+            return null;
+        }
+    }
+
+
 
     // TODO: add method to parse templates. This method should return a dict of templates with settings. 
 

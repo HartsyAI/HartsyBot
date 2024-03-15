@@ -11,11 +11,13 @@ namespace HartsyBot.Core
 
         private readonly DiscordSocketClient _client;
         private readonly Showcase _showcase;
+        private readonly Commands _commands;
 
-        public InteractionHandlers(DiscordSocketClient client, Showcase showcase)
+        public InteractionHandlers(DiscordSocketClient client, Showcase showcase, Commands commands)
         {
             _client = client;
             _showcase = showcase;
+            _commands = commands;
         }
 
         private static readonly Dictionary<(ulong, string), DateTime> _lastInteracted = [];
@@ -150,7 +152,7 @@ namespace HartsyBot.Core
 
             var channel = Context.Channel as SocketTextChannel;
             var user = (SocketGuildUser)Context.User;
-            await Core.Commands.GenerateImages.GenerateFromTemplate(text, template, channel, user, description);
+            await _commands.GenerateFromTemplate(text, template, channel, user, description);
             // TODO: Break up the generate_logo command into smaller functions so that we can call them here
 
         }
