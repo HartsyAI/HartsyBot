@@ -101,19 +101,7 @@ namespace HartsyBot
                 {
                     // Register command modules with the InteractionService.
                     // Tells  to scan the whole assembly for classes that define slash commands.
-                    await _interactions.RegisterCommandsGloballyAsync(true);
                     await _interactions.AddModulesAsync(Assembly.GetEntryAssembly(), _serviceProvider);
-
-                    // DEBUG: Delete all global commands
-                    //await _client.Rest.DeleteAllGlobalCommandsAsync();
-
-                    // Get the ID of the first guild the bot is a member of
-                    // Then register the commands to that guild
-                    //var guildId = _client.Guilds.First().Id;
-                    //await _interactions.RegisterCommandsToGuildAsync(guildId, true);
-                    //await _interactions.RegisterCommandsGloballyAsync(true);
-                    //await _client.Rest.DeleteAllGlobalCommandsAsync();
-
 
                     foreach (var guild in _client.Guilds)
                     {
