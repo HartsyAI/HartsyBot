@@ -2,10 +2,8 @@
 using Discord.WebSocket;
 using Discord;
 using Hartsy.Core;
-using static System.Reflection.Metadata.BlobBuilder;
-using System.Diagnostics.Metrics;
 using System.Drawing;
-using static SupabaseClient;
+using System.Drawing.Imaging;
 
 namespace HartsyBot.Core
 {
@@ -13,27 +11,29 @@ namespace HartsyBot.Core
     {
         private readonly SupabaseClient _supabaseClient;
         private readonly RunpodAPI _runpodAPI;
+        private readonly StableSwarmAPI _stableSwarmAPI;
 
         public Commands()
         {
             _supabaseClient = new SupabaseClient();
             _runpodAPI = new RunpodAPI();
+            _stableSwarmAPI = new StableSwarmAPI();
         }
 
-        [SlashCommand("runpod_test", "test generation from runpod")]
-        public async Task RunpodTestCommand()
-        {
-            try
-            {
-                string userId = Context.User.Id.ToString();
-                _supabaseClient.AddGenerationAsync(userId);
-                await RespondAsync("Testing, please wait...", ephemeral: true);
-            }
-            catch (Exception ex)
-            {
-                await RespondAsync($"An error occurred: {ex.Message}", ephemeral: true);
-            }
-        }
+        //[SlashCommand("runpod_test", "test generation from runpod")]
+        //public async Task RunpodTestCommand()
+        //{
+        //    try
+        //    {
+        //        string userId = Context.User.Id.ToString();
+        //        _supabaseClient.AddGenerationAsync(userId);
+        //        await RespondAsync("Testing, please wait...", ephemeral: true);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        await RespondAsync($"An error occurred: {ex.Message}", ephemeral: true);
+        //    }
+        //}
 
         [SlashCommand("help", "Learn how to use the bot")]
         public async Task HelpCommand()
@@ -60,7 +60,6 @@ namespace HartsyBot.Core
                 await RespondAsync($"An error occurred: {ex.Message}", ephemeral: true);
             }
         }
-
 
         [SlashCommand("user_info", "Get information about the user.")]
         public async Task UserInfoCommand(
@@ -224,33 +223,33 @@ namespace HartsyBot.Core
             public string Title => "Server Rules";
 
             [InputLabel("Description")]
-            [ModalTextInput("description_input", TextInputStyle.Paragraph, 
+            [ModalTextInput("description_input", TextInputStyle.Paragraph,
             placeholder: "Enter a brief description", maxLength: 300)]
             public string? Description { get; set; }
 
             [InputLabel("Server Rules")]
-            [ModalTextInput("server_rules", TextInputStyle.Paragraph, 
+            [ModalTextInput("server_rules", TextInputStyle.Paragraph,
             placeholder: "List the server rules here", maxLength: 800)]
             public string? Server_rules { get; set; }
 
             [InputLabel("Code of Conduct")]
-            [ModalTextInput("code_of_conduct_input", TextInputStyle.Paragraph, 
+            [ModalTextInput("code_of_conduct_input", TextInputStyle.Paragraph,
             placeholder: "Describe the code of conduct", maxLength: 400)]
             public string? CodeOfConduct { get; set; }
 
             [InputLabel("Our Story")]
-            [ModalTextInput("our_story_input", TextInputStyle.Paragraph, 
+            [ModalTextInput("our_story_input", TextInputStyle.Paragraph,
             placeholder: "Share the story of your community", maxLength: 400)]
             public string? OurStory { get; set; }
 
             [InputLabel("What Does This Button Do?")]
-            [ModalTextInput("button_function_description_input", TextInputStyle.Paragraph, 
+            [ModalTextInput("button_function_description_input", TextInputStyle.Paragraph,
             placeholder: "Explain the function of this button", maxLength: 200)]
             public string? ButtonFunction { get; set; }
 
             // Constructors
             public RulesModal() { /* ... */ }
-            public RulesModal(string description, string server_rules, string codeOfConduct, string ourStory, string buttonFunction) 
+            public RulesModal(string description, string server_rules, string codeOfConduct, string ourStory, string buttonFunction)
             {
                 // Initialize with provided values
                 Description = description;
@@ -281,82 +280,90 @@ namespace HartsyBot.Core
             string TemplateInfo = string.Empty;
             // Fetch the templates from the database
             var templates = await _supabaseClient.GetTemplatesAsync();
-            if (templates != null && templates.TryGetValue(template, out Template templateDetails))
+            if (templates != null && templates.TryGetValue(template, out var templateDetails))
             {
-                // Construct the prompt from the parameters
                 string positiveText = templateDetails.Positive.Replace("__TEXT_REPLACE__", text);
-                Console.WriteLine($"Positive Text: {positiveText}");
                 prompt = $"{positiveText}, {description}";
-                TemplateInfo = $"{templateDetails.Description}";
+                TemplateInfo = templateDetails.Description;
             }
 
             var username = user.Username;
-            string projectRoot = Directory.GetParent(Environment.CurrentDirectory).Parent.Parent.FullName;
-            string waitImageFilePath = Path.Combine(projectRoot, "images", "wait.gif");
-
 
             // Create a placeholder embed
             var embed = new EmbedBuilder()
                 .WithAuthor(user)
                 .WithTitle("Thank you for generating your image with Hartsy.AI")
                 .WithDescription($"Generating an image described by **{username}**\n\n" +
-                    $"**Template Used:** {template}\n\n`{TemplateInfo}`\n\n")
+                                 $"**Template Used:** {template}\n\n`{TemplateInfo}`\n\n")
                 .WithColor(Discord.Color.DarkerGrey)
-                .WithFooter("CFG:4.5 | Steps:35 | Height:768 | Width:1024")
                 .WithCurrentTimestamp()
-                .WithImageUrl($"attachment://wait.gif")
                 .Build();
 
-            // Send the placeholder message
-            //var previewMsg = await channel.SendMessageAsync(embed: embed);
-            var previewMsg = await channel.SendFileAsync(waitImageFilePath, "wait.gif", embed: embed);
+            var previewMsg = await channel.SendMessageAsync(embed: embed);
 
-            // Generate the image
-            var base64Images = await StableSwarmAPI.GenerateImage(prompt);
-            if (base64Images.Count > 0)
+            // Generate the image and update the embed with each received image
+            await foreach (var (imageBase64, isFinal) in _stableSwarmAPI.GenerateImage(prompt))
             {
-                var apiInstance = new StableSwarmAPI();
-                string filePath = await apiInstance.ConvertAndSaveImage(base64Images[0], username, previewMsg.Id, "jpg");
-                // Filename used in the attachment
-                string filename = Path.GetFileName(filePath);
-
-                // Set the description to "None" if it's empty
-                description = string.IsNullOrEmpty(description) ? "None" : description;
-
+                Console.WriteLine($"Received image. Final: {isFinal}");
+                var filePath = await _stableSwarmAPI.ConvertAndSaveImage(imageBase64, username, previewMsg.Id, "png", isFinal);
 
                 if (!string.IsNullOrEmpty(filePath))
                 {
-                    // Modify the message by grabbing the embed and generate a embedbuilder
-                    var updatedEmbed = previewMsg.Embeds.First().ToEmbedBuilder();
-                    updatedEmbed.WithDescription($"Generated an image for **{username}**\n\n**Text:** {text}\n\n**Extra Description:** {description}" +
-                        $"\n\n**Template Used:** {template}\n\n`{TemplateInfo}`");
-                    updatedEmbed.WithColor(Discord.Color.Green);
+                    // resize image to 1024x768
+                    // Load the original image
+                    using (var image = System.Drawing.Image.FromFile(filePath))
+                    {
+                        // Define a new file path for the resized image
+                        var newFilePath = Path.Combine(Path.GetDirectoryName(filePath), $"resized-{Path.GetFileName(filePath)}");
+
+                        // Resize the image
+                        using (var resizedImage = new Bitmap(image, new Size(1024, 768)))
+                        {
+                            // Save the resized image to the new file path
+                            resizedImage.Save(newFilePath, System.Drawing.Imaging.ImageFormat.Png);
+                        }
+
+                        // Update filePath to point to the new resized image
+                        filePath = newFilePath;
+                    }
+                    // Filename used in the attachment
+                    string filename = Path.GetFileName(filePath);
+
+                    var updatedEmbed = previewMsg.Embeds.FirstOrDefault()?.ToEmbedBuilder() ?? new EmbedBuilder();
                     updatedEmbed.WithImageUrl($"attachment://{filename}");
                     var fileAttachment = new FileAttachment(filePath);
 
-                    var components = new ComponentBuilder()
+                    if (isFinal)
+                    {
+                        updatedEmbed.WithDescription($"Generated an image for **{username}**\n\n**Text:** {text}\n\n**Extra Description:** {description}" +
+                        $"\n\n**Template Used:** {template}\n\n`{TemplateInfo}`");
+                        updatedEmbed.WithColor(Discord.Color.Green);
+                        updatedEmbed.WithFooter("Visit Hartsy.AI to generate more!");
+
+                        var components = new ComponentBuilder()
                         .WithButton("Regenerate", "regenerate", ButtonStyle.Success)
                         .WithButton("Add to Showcase", "showcase:add", ButtonStyle.Primary)
                         .WithButton("Report", "report:admin", ButtonStyle.Secondary, emote: new Emoji("\u26A0")) // ⚠
                         .WithButton(" ", "delete", ButtonStyle.Danger, emote: new Emoji("\uD83D\uDDD1"))// 🗑
                         .Build();
 
-                    // Update the original message with the new embed and attachment
-                    await previewMsg.ModifyAsync(m =>
+                        await previewMsg.ModifyAsync(m =>
+                        {
+                            m.Embed = updatedEmbed.Build();
+                            m.Attachments = new[] { fileAttachment };
+                            m.Components = components;
+                        });
+                    }
+                    else
                     {
-                        m.Embed = updatedEmbed.Build();
-                        m.Attachments = new[] { fileAttachment };
-                        m.Components = components;
-                    });
+                        await previewMsg.ModifyAsync(m =>
+                        {
+                            m.Embed = updatedEmbed.Build();
+                            m.Attachments = new[] { fileAttachment };
+                        });
+                    }
+                    if (isFinal) break;  // Exit the loop if the final image has been processed
                 }
-                else
-                {
-                    await channel.SendMessageAsync("Failed to generate image.");
-                }
-            }
-            else
-            {
-                await channel.SendMessageAsync("No images were generated.");
             }
         }
     }

@@ -1,35 +1,45 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Net.Http;
+using System.Net.WebSockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
-using Discord;
-using Discord.Interactions;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Supabase.Gotrue;
+using Supabase.Interfaces;
 
 namespace Hartsy.Core
 {
     public class StableSwarmAPI
     {
-        private static readonly HttpClient Client = new();
+        private static readonly HttpClient Client = new HttpClient();
+        private ClientWebSocket _webSocket;
+        private readonly string _swarmURL;
         private static string Session = "";
-        // Swarm API base URL
-        public static readonly string? BaseUrl = Environment.GetEnvironmentVariable("SWARM_URL");
 
-        static StableSwarmAPI()
+
+        public StableSwarmAPI()
         {
-            Client.DefaultRequestHeaders.Add("user-agent", "HartsyBot/1.0");
-            Client.Timeout = TimeSpan.FromMinutes(4); // Adjust the timeout as needed
+            _webSocket = new ClientWebSocket();
+            _swarmURL = Environment.GetEnvironmentVariable("SWARM_URL");
         }
 
-        public class SessionInvalidException : Exception { }
+        private async Task EnsureWebSocketConnectionAsync()
+        {
+            if (_webSocket.State != WebSocketState.Open)
+            {
+                Uri serverUri = new Uri($"{_swarmURL.Replace("http", "ws")}/API/GenerateText2ImageWS");
+                await _webSocket.ConnectAsync(serverUri, CancellationToken.None);
+            }
+        }
 
-        private static async Task GetSession()
+        async Task GetSession()
         {
             try
             {
-                JObject sessData = await PostJson($"{BaseUrl}/API/GetNewSession", []);
+                JObject sessData = await PostJson($"{_swarmURL}/API/GetNewSession", []);
                 Session = sessData["session_id"].ToString();
                 Console.WriteLine($"Session acquired successfully: {Session}");
             }
@@ -40,93 +50,150 @@ namespace Hartsy.Core
             }
         }
 
-        public static async Task<List<string>> GenerateImage(string prompt)
+        public async IAsyncEnumerable<(string imageBase64, bool isFinal)> GenerateImage(string prompt)
         {
-            // First, get a fresh session ID
             await GetSession();
-            JObject request = new()
+            await EnsureWebSocketConnectionAsync();
+
+            var request = new
             {
-                ["session_id"] = Session,
-                ["prompt"] = prompt,
-                ["negativeprompt"] = "malformed letters, repeating letters, double letters",
-                ["images"] = 1,
-                ["donotsave"] = true,
-                ["model"] = "starlightXLAnimated_v3.safetensors",
-                ["loras"] = "Harrlogos_v2.0.safetensors",
-                ["loraweights"] = 1.2,
-                ["width"] = 1024,
-                ["height"] = 768,
-                ["cfgscale"] = 4.5,
-                ["steps"] = 35,
-                ["seed"] = -1,
-                ["sampler"] = "euler",
-                ["scheduler"] = "karras",
+                session_id = Session,
+                prompt = prompt,
+                negativeprompt = "malformed letters, repeating letters, double letters",
+                images = 1,
+                donotsave = true,
+                model = "starlightXLAnimated_v3.safetensors",
+                loras = "Harrlogos_v2.0.safetensors",
+                loraweights = 1,
+                width = 1024,
+                height = 768,
+                cfgscale = 5.5,
+                steps = 34,
+                seed = -1,
+                sampler = "dpmpp_3m_sde",
+                scheduler = "karras",
             };
 
-            try
+            string requestJson = JsonConvert.SerializeObject(request);
+            ArraySegment<byte> buffer = new ArraySegment<byte>(Encoding.UTF8.GetBytes(requestJson));
+
+            await _webSocket.SendAsync(buffer, WebSocketMessageType.Text, true, CancellationToken.None);
+
+            var responseBuffer = new ArraySegment<byte>(new byte[8192]);
+            StringBuilder stringBuilder = new StringBuilder();
+            int previewCount = 0;
+
+            while (_webSocket.State == WebSocketState.Open)
             {
-                JObject response = await PostJson($"{BaseUrl}/API/GenerateText2Image", request);
-                if (response.TryGetValue("error_id", out JToken errorId) && errorId.ToString() == "invalid_session_id")
+                WebSocketReceiveResult result;
+                stringBuilder.Clear();
+
+                do
                 {
-                    throw new SessionInvalidException();
+                    result = await _webSocket.ReceiveAsync(responseBuffer, CancellationToken.None);
+                    var jsonStringFragment = Encoding.UTF8.GetString(responseBuffer.Array, responseBuffer.Offset, result.Count);
+                    stringBuilder.Append(jsonStringFragment);
+                } while (!result.EndOfMessage);
+
+                if (result.MessageType == WebSocketMessageType.Close)
+                {
+                    await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, string.Empty, CancellationToken.None);
+                    break;
                 }
+                else
+                {
+                    var jsonString = stringBuilder.ToString();
+                    var responseData = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonString);
 
-                var images = ParseImages(response);
-                Console.WriteLine($"Generated {images.Count} images.");
-                return images;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error in GenerateImage: {ex.Message}");
-                throw;
+                    if (responseData != null)
+                    {
+
+                        if (responseData.ContainsKey("gen_progress"))
+                        {
+                            var genProgressData = JsonConvert.DeserializeObject<Dictionary<string, object>>(responseData["gen_progress"].ToString());
+                            //Console.WriteLine($"Generation progress data: {JsonConvert.SerializeObject(genProgressData, Formatting.Indented)}");
+
+                            // Print the total percent of completion
+                            //if (genProgressData.ContainsKey("overall_percent"))
+                            //{
+                            //    var overallPercent = genProgressData["overall_percent"].ToString();
+                            //    Console.WriteLine($"Generation progress: {overallPercent}%");
+                            //}
+                            if (genProgressData.ContainsKey("preview"))
+                            {
+                                previewCount++;
+                                if (previewCount % 4 == 0)
+                                {
+                                    var previewData = genProgressData["preview"].ToString();
+                                    Console.WriteLine("Preview data received");
+                                    yield return (previewData, isFinal: false);
+                                }
+                            }
+                        }
+
+                        if (responseData.ContainsKey("image"))
+                        {
+                            string finalImage = responseData["image"].ToString();
+                            Console.WriteLine("Final image received");
+                            if (_webSocket.State != WebSocketState.Closed)
+                            {
+                                await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Completed", CancellationToken.None);
+                            }
+                            yield return (finalImage, isFinal: true);
+                        }
+                    }
+                }
             }
         }
 
-        private static Stream Base64ToStream(string base64String)
-        {
-            byte[] imageBytes = Convert.FromBase64String(base64String);
-            return new MemoryStream(imageBytes);
-        }
-
-        private static List<string> ParseImages(JObject response)
-        {
-            var base64Images = new List<string>();
-            foreach (var img in response["images"])
-            {
-                string base64Image = img.ToString();
-                base64Images.Add(base64Image);
-            }
-            return base64Images;
-        }
-        public async Task<string> ConvertAndSaveImage(string base64Data, string username, ulong messageId, string fileExtension)
+        public async Task<string> ConvertAndSaveImage(string base64Data, string username, ulong messageId, string fileExtension, bool isFinal)
         {
             // Ensure the images directory exists
             string imagesDirectory = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "images");
             Directory.CreateDirectory(imagesDirectory);
 
-            // Extract the base64 content from the data URI
-            string base64Image = base64Data.Split(',').LastOrDefault();
-            if (string.IsNullOrEmpty(base64Image))
+            // Check if the base64 data contains the prefix and remove it
+            var base64Prefix = "base64,";
+            var dataIndex = base64Data.IndexOf(base64Prefix);
+            if (dataIndex > -1)
             {
-                Console.WriteLine("Invalid base64 data");
-                return null;
+                base64Data = base64Data.Substring(dataIndex + base64Prefix.Length);
             }
 
-            // Construct the file path
-            string date = DateTime.UtcNow.ToString("yyyy-MM-dd");
-            string timeAndMessageId = $"{DateTime.UtcNow:HH-mm-ss}_{messageId}.{fileExtension}";
-            string filePath = Path.Combine(imagesDirectory, username, date, timeAndMessageId);
+            // Trim any whitespace characters from the base64 string
+            base64Data = base64Data.Trim();
+
+            // Construct the file path with a unique identifier
+            string dateTimeFormat = "yyyy-MM-dd_HH-mm-ss-fff";
+            string date = DateTime.UtcNow.ToString(dateTimeFormat);
+            string identifier = isFinal ? "final" : Guid.NewGuid().ToString();
+            string timeAndMessageId = $"{date}_{messageId}_{identifier}.{fileExtension}";
+            string userDirectory = Path.Combine(imagesDirectory, username);
+            string filePath = Path.Combine(userDirectory, timeAndMessageId);
 
             // Ensure the user's directory exists
-            string userDirectory = Path.GetDirectoryName(filePath);
             Directory.CreateDirectory(userDirectory);
 
-            // Convert base64 string to an image and save it
-            byte[] imageBytes = Convert.FromBase64String(base64Image);
-            await File.WriteAllBytesAsync(filePath, imageBytes);
-
-            return filePath;
+            try
+            {
+                // Convert base64 string to an image and save it
+                byte[] imageBytes = Convert.FromBase64String(base64Data);
+                await File.WriteAllBytesAsync(filePath, imageBytes);
+                return filePath;
+            }
+            catch (FormatException ex)
+            {
+                Console.WriteLine($"Error converting base64 to image: {ex.Message}");
+                return null;
+            }
         }
+
+        private bool IsBase64String(string base64)
+        {
+            Span<byte> buffer = new Span<byte>(new byte[base64.Length]);
+            return Convert.TryFromBase64String(base64, buffer, out _);
+        }
+
         private static async Task<JObject> PostJson(string url, JObject jsonData)
         {
             try
@@ -148,5 +215,6 @@ namespace Hartsy.Core
                 throw;
             }
         }
+
     }
 }
