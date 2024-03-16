@@ -84,13 +84,13 @@ namespace HartsyBot.Core
                         .WithThumbnailUrl(userInfo.Avatar_URL ?? user.GetAvatarUrl() ?? user.GetDefaultAvatarUrl())
                         .AddField("Full Name", userInfo.Name ?? "N/A", true)
                         .AddField("Email", userInfo.Email ?? "N/A", true)
-                        .AddField("Subscription Level", subscriptionInfo != null ? subscriptionInfo.Status ?? "Active" : "No Subscription", true)
+                        //.AddField("Subscription Level", subscriptionInfo != null ? subscriptionInfo.PlanName ?? "Active" : "No Subscription", true)
                         .AddField("Credit Limit", userInfo.Credit?.ToString() ?? "N/A", true)
                         .AddField("Likes", userInfo.Likes?.ToString() ?? "0", true);
 
                     if (subscriptionInfo != null)
                     {
-                        embed.AddField("Subscription Status", subscriptionInfo.Status ?? "N/A", true);
+                        embed.AddField("Subscription Status", subscriptionInfo.PlanName ?? "N/A", true);
                     }
 
                     embed.WithColor(Discord.Color.Blue);

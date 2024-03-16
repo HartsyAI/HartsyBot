@@ -113,16 +113,16 @@ public class SupabaseClient
         }
     }
 
-    public async Task<Subscriptions?> GetSubscriptionByUserId(string userId)
+    public async Task<Users?> GetSubscriptionByUserId(string userId)
     {
         try
         {
             Console.WriteLine("\nAttempting to fetch subscription for user ID: " + userId + "\n");
 
             // Query to get subscription data for a specific user ID
-            var response = await supabase.From<Subscriptions>()
+            var response = await supabase.From<Users>()
             .Select("*")
-            .Filter("user_id", Operator.Equals, userId)
+            .Filter("id", Operator.Equals, userId)
             .Single();
 
             //Console.WriteLine($"Subscriptions Table # of Rows: {response.Models.Count}");
@@ -134,18 +134,6 @@ public class SupabaseClient
             Console.WriteLine($"Images Table # of Rows: {images.Models.Count}");
             var generations = await supabase.From<Generations>().Get();
             Console.WriteLine($"Generations Table # of Rows: {generations.Models.Count}");
-
-            var getTemplates = await GetTemplatesAsync();
-            foreach (var template in getTemplates.Values)
-            {
-                Console.WriteLine($"Template Name: {template.Name}");
-                Console.WriteLine($"Positive: {template.Positive}");
-                Console.WriteLine($"Negative: {template.Negative}");
-                Console.WriteLine($"Checkpoint: {template.Checkpoint}");
-                Console.WriteLine($"Seed: {template.Seed}");
-                Console.WriteLine($"Description: {template.Description}");
-                Console.WriteLine("-------------------------------");
-            }
 
             if (response != null)
             {
