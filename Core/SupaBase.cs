@@ -224,6 +224,28 @@ public class SupabaseClient
         }
     }
 
+    public async Task AddTemplate(Template newTemplate)
+    {
+        try
+        {
+
+            var response = await supabase.From<Template>().Insert(newTemplate);
+
+            if (response == null)
+            {
+                Console.WriteLine($"Error inserting new template: {response.ResponseMessage}");
+            }
+            else
+            {
+                Console.WriteLine("New template row added successfully.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error adding template: {ex.Message}");
+        }
+    }
+
     // TODO: add method to parse templates. This method should return a dict of templates with settings. 
 
 
