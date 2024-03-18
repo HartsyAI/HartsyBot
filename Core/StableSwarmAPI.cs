@@ -26,15 +26,6 @@ namespace Hartsy.Core
             _swarmURL = Environment.GetEnvironmentVariable("SWARM_URL");
         }
 
-        private async Task EnsureWebSocketConnectionAsync()
-        {
-            if (_webSocket.State != WebSocketState.Open)
-            {
-                Uri serverUri = new Uri($"{_swarmURL.Replace("http", "ws")}/API/GenerateText2ImageWS");
-                await _webSocket.ConnectAsync(serverUri, CancellationToken.None);
-            }
-        }
-
         async Task GetSession()
         {
             try
@@ -53,96 +44,97 @@ namespace Hartsy.Core
         public async IAsyncEnumerable<(string imageBase64, bool isFinal)> GenerateImage(string prompt)
         {
             await GetSession();
-            await EnsureWebSocketConnectionAsync();
-
-            var request = new
+            using (var webSocket = new ClientWebSocket())
             {
-                session_id = Session,
-                prompt = prompt,
-                negativeprompt = "malformed letters, repeating letters, double letters",
-                images = 1,
-                donotsave = true,
-                model = "starlightXLAnimated_v3.safetensors",
-                loras = "Harrlogos_v2.0.safetensors",
-                loraweights = 1,
-                width = 1024,
-                height = 768,
-                cfgscale = 5.5,
-                steps = 34,
-                seed = -1,
-                sampler = "dpmpp_3m_sde",
-                scheduler = "karras",
-            };
+                await EnsureWebSocketConnectionAsync(webSocket);
 
-            string requestJson = JsonConvert.SerializeObject(request);
-            ArraySegment<byte> buffer = new ArraySegment<byte>(Encoding.UTF8.GetBytes(requestJson));
-
-            await _webSocket.SendAsync(buffer, WebSocketMessageType.Text, true, CancellationToken.None);
-
-            var responseBuffer = new ArraySegment<byte>(new byte[8192]);
-            StringBuilder stringBuilder = new StringBuilder();
-            int previewCount = 0;
-
-            while (_webSocket.State == WebSocketState.Open)
-            {
-                WebSocketReceiveResult result;
-                stringBuilder.Clear();
-
-                do
+                var request = new
                 {
-                    result = await _webSocket.ReceiveAsync(responseBuffer, CancellationToken.None);
-                    var jsonStringFragment = Encoding.UTF8.GetString(responseBuffer.Array, responseBuffer.Offset, result.Count);
-                    stringBuilder.Append(jsonStringFragment);
-                } while (!result.EndOfMessage);
+                    session_id = Session,
+                    prompt = prompt,
+                    negativeprompt = "malformed letters, repeating letters, double letters",
+                    images = 1,
+                    donotsave = true,
+                    model = "starlightXLAnimated_v3.safetensors",
+                    loras = "an0tha0ne.safetensors",
+                    loraweights = 1,
+                    width = 1024,
+                    height = 768,
+                    cfgscale = 5.5,
+                    steps = 34,
+                    seed = -1,
+                    sampler = "dpmpp_3m_sde",
+                    scheduler = "karras",
+                };
 
-                if (result.MessageType == WebSocketMessageType.Close)
-                {
-                    await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, string.Empty, CancellationToken.None);
-                    break;
-                }
-                else
-                {
-                    var jsonString = stringBuilder.ToString();
-                    var responseData = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonString);
+                string requestJson = JsonConvert.SerializeObject(request);
+                ArraySegment<byte> buffer = new ArraySegment<byte>(Encoding.UTF8.GetBytes(requestJson));
 
-                    if (responseData != null)
+                await webSocket.SendAsync(buffer, WebSocketMessageType.Text, true, CancellationToken.None);
+
+                var responseBuffer = new ArraySegment<byte>(new byte[8192]);
+                StringBuilder stringBuilder = new StringBuilder();
+                int previewCount = 0;
+
+                while (webSocket.State == WebSocketState.Open)
+                {
+                    WebSocketReceiveResult result;
+                    stringBuilder.Clear();
+
+                    do
                     {
+                        result = await webSocket.ReceiveAsync(responseBuffer, CancellationToken.None);
+                        var jsonStringFragment = Encoding.UTF8.GetString(responseBuffer.Array, responseBuffer.Offset, result.Count);
+                        stringBuilder.Append(jsonStringFragment);
+                    } while (!result.EndOfMessage);
 
-                        if (responseData.ContainsKey("gen_progress"))
+                    if (result.MessageType == WebSocketMessageType.Close)
+                    {
+                        await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, string.Empty, CancellationToken.None);
+                        break;
+                    }
+                    else
+                    {
+                        var jsonString = stringBuilder.ToString();
+                        var responseData = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonString);
+
+                        if (responseData != null)
                         {
-                            var genProgressData = JsonConvert.DeserializeObject<Dictionary<string, object>>(responseData["gen_progress"].ToString());
-                            //Console.WriteLine($"Generation progress data: {JsonConvert.SerializeObject(genProgressData, Formatting.Indented)}");
-
-                            // Print the total percent of completion
-                            //if (genProgressData.ContainsKey("overall_percent"))
-                            //{
-                            //    var overallPercent = genProgressData["overall_percent"].ToString();
-                            //    Console.WriteLine($"Generation progress: {overallPercent}%");
-                            //}
-                            if (genProgressData.ContainsKey("preview"))
+                            if (responseData.ContainsKey("gen_progress"))
                             {
-                                previewCount++;
-                                if (previewCount % 4 == 0)
+                                var genProgressData = JsonConvert.DeserializeObject<Dictionary<string, object>>(responseData["gen_progress"].ToString());
+
+                                if (genProgressData.ContainsKey("preview"))
                                 {
-                                    var previewData = genProgressData["preview"].ToString();
-                                    Console.WriteLine("Preview data received");
-                                    yield return (previewData, isFinal: false);
+                                    previewCount++;
+                                    if (previewCount % 4 == 0)
+                                    {
+                                        var previewData = genProgressData["preview"].ToString();
+                                        Console.WriteLine("Preview data received");
+                                        yield return (previewData, isFinal: false);
+                                    }
                                 }
                             }
-                        }
 
-                        if (responseData.ContainsKey("image"))
-                        {
-                            string finalImage = responseData["image"].ToString();
-                            Console.WriteLine("Final image received");
-                            if (_webSocket.State != WebSocketState.Closed)
+                            if (responseData.ContainsKey("image"))
                             {
-                                await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Completed", CancellationToken.None);
+                                string finalImage = responseData["image"].ToString();
+                                Console.WriteLine("Final image received");
+                                await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, string.Empty, CancellationToken.None);
+                                yield return (finalImage, isFinal: true);
                             }
-                            yield return (finalImage, isFinal: true);
                         }
                     }
                 }
+            }
+        }
+
+        private async Task EnsureWebSocketConnectionAsync(ClientWebSocket webSocket)
+        {
+            if (webSocket.State != WebSocketState.Open)
+            {
+                Uri serverUri = new Uri($"{_swarmURL.Replace("http", "ws")}/API/GenerateText2ImageWS");
+                await webSocket.ConnectAsync(serverUri, CancellationToken.None);
             }
         }
 

@@ -278,6 +278,8 @@ namespace HartsyBot.Core
         {
             string prompt = string.Empty;
             string TemplateInfo = string.Empty;
+            string projectRoot = Directory.GetParent(Environment.CurrentDirectory).Parent.Parent.FullName;
+            string waitImageFilePath = Path.Combine(projectRoot, "images", "wait.gif");
             // Fetch the templates from the database
             var templates = await _supabaseClient.GetTemplatesAsync();
             if (templates != null && templates.TryGetValue(template, out var templateDetails))
@@ -295,11 +297,13 @@ namespace HartsyBot.Core
                 .WithTitle("Thank you for generating your image with Hartsy.AI")
                 .WithDescription($"Generating an image described by **{username}**\n\n" +
                                  $"**Template Used:** {template}\n\n`{TemplateInfo}`\n\n")
+                .WithImageUrl($"attachment://wait.gif")
                 .WithColor(Discord.Color.DarkerGrey)
                 .WithCurrentTimestamp()
                 .Build();
 
-            var previewMsg = await channel.SendMessageAsync(embed: embed);
+            //var previewMsg = await channel.SendMessageAsync(embed: embed);
+            var previewMsg = await channel.SendFileAsync(waitImageFilePath, embed: embed);
 
             // Generate the image and update the embed with each received image
             await foreach (var (imageBase64, isFinal) in _stableSwarmAPI.GenerateImage(prompt))

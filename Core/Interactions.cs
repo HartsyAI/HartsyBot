@@ -267,5 +267,15 @@ namespace HartsyBot.Core
 
             // TODO: Implement the actual reporting logic
         }
+
+        [ComponentInteraction("link_account")]
+        public async Task LinkAccountButtonHandler()
+        {
+            if (IsOnCooldown(Context.User, "link_account"))
+            {
+                await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
+                return;
+            }
+        }
     }
 }
