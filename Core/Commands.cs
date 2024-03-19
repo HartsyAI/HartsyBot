@@ -4,6 +4,7 @@ using Discord;
 using Hartsy.Core;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Runtime.CompilerServices;
 
 namespace HartsyBot.Core
 {
@@ -19,21 +20,6 @@ namespace HartsyBot.Core
             _runpodAPI = new RunpodAPI();
             _stableSwarmAPI = new StableSwarmAPI();
         }
-
-        //[SlashCommand("runpod_test", "test generation from runpod")]
-        //public async Task RunpodTestCommand()
-        //{
-        //    try
-        //    {
-        //        string userId = Context.User.Id.ToString();
-        //        _supabaseClient.AddGenerationAsync(userId);
-        //        await RespondAsync("Testing, please wait...", ephemeral: true);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        await RespondAsync($"An error occurred: {ex.Message}", ephemeral: true);
-        //    }
-        //}
 
         [SlashCommand("help", "Learn how to use the bot")]
         public async Task HelpCommand()
@@ -110,6 +96,15 @@ namespace HartsyBot.Core
         [SlashCommand("setup_rules", "Set up rules for the server.")]
         public async Task SetupRulesCommand()
         {
+            // Check if the user has the "HARTSY Staff" role
+            var user = Context.User as SocketGuildUser;
+            var hasHartsyStaffRole = user.Roles.Any(role => role.Name.Equals("HARTSY Staff", StringComparison.OrdinalIgnoreCase));
+
+            if (!hasHartsyStaffRole)
+            {
+                await RespondAsync("Only admins can perform this command. Report this with information on how you are even able to see this command!", ephemeral: true);
+                return;
+            }
             try
             {
                 var rulesChannel = Context.Guild.TextChannels.FirstOrDefault(x => x.Name == "rules");
@@ -267,17 +262,72 @@ namespace HartsyBot.Core
             [Autocomplete(typeof(TemplateAutocompleteHandler))] string template,
             [Summary("additional_details", "Describe other aspects to add to the prompt.")] string description = null)
         {
-            await RespondAsync("Generating image, please wait...", ephemeral: true);
-            // Get the channel and convert it to a SocketTextChannel
-            var channel = Context.Channel as SocketTextChannel;
             var user = Context.User as SocketGuildUser;
+            var userInfo = await _supabaseClient.GetUserByDiscordId(user.Id.ToString());
+            if (userInfo == null)
+            {
+                await HandleSubscriptionFailure(user);
+                return;
+            }
+            var subStatus = userInfo.PlanName;
+
+            // Check if the user has a valid subscription and enough credits
+            if (subStatus != null && userInfo.Credit > 0)
+            {
+                // Add the role to the user if they do not have it
+                await AddSubRole(user, subStatus);
+
+                // Proceed with image generation
+                await GenerateImageWithCredits(user, text, template, description, userInfo.Credit ?? 0);
+            }
+            else
+            {
+                // Handle the lack of subscription or insufficient credits
+                await HandleSubscriptionFailure(user);
+            }
+        }
+
+        private async Task AddSubRole(SocketGuildUser user, string subStatus)
+        {
+            var subRole = user.Guild.Roles.FirstOrDefault(role => role.Name.Equals(subStatus, StringComparison.OrdinalIgnoreCase));
+            if (subRole != null && !user.Roles.Contains(subRole))
+            {
+                await user.AddRoleAsync(subRole);
+            }
+        }
+
+        private async Task GenerateImageWithCredits(SocketGuildUser user, string text, string template, string description, int credits)
+        {
+            await RespondAsync($"You have {credits} credits. You will have {credits - 1} credits remaining after this generation.", ephemeral: true);
+            // Remove credit from user
+            await _supabaseClient.UpdateUserCredit(user.Id.ToString(), credits - 1);
+            var channel = Context.Channel as SocketTextChannel;
             await GenerateFromTemplate(text, template, channel, user, description);
         }
+
+        private async Task HandleSubscriptionFailure(SocketGuildUser user)
+        {
+            var embed = new EmbedBuilder()
+                .WithTitle("Access Denied")
+                .WithDescription("You either do not have a valid subscription or you have insufficient credits. " +
+                "Please visit Hartsy.AI to manage your subscription or purchase more credits.")
+                .WithColor(Discord.Color.Red)
+                .WithTimestamp(DateTimeOffset.Now)
+                .Build();
+
+            var button = new ComponentBuilder()
+                .WithButton("Click to Subscribe or Add Credits", null, ButtonStyle.Link, url: "https://hartsy.ai/support")
+                .Build();
+
+            await RespondAsync(embed: embed, components: button, ephemeral: true);
+        }
+
 
         public async Task GenerateFromTemplate(string text, string template, SocketTextChannel channel, SocketGuildUser user, string description = null)
         {
             string prompt = string.Empty;
             string TemplateInfo = string.Empty;
+            string imageUrl = string.Empty;
             string projectRoot = Directory.GetParent(Environment.CurrentDirectory).Parent.Parent.FullName;
             string waitImageFilePath = Path.Combine(projectRoot, "images", "wait.gif");
             // Fetch the templates from the database
@@ -287,6 +337,7 @@ namespace HartsyBot.Core
                 string positiveText = templateDetails.Positive.Replace("__TEXT_REPLACE__", text);
                 prompt = $"{positiveText}, {description}";
                 TemplateInfo = templateDetails.Description;
+                imageUrl = templateDetails.ImageUrl;
             }
 
             var username = user.Username;
@@ -298,6 +349,7 @@ namespace HartsyBot.Core
                 .WithDescription($"Generating an image described by **{username}**\n\n" +
                                  $"**Template Used:** {template}\n\n`{TemplateInfo}`\n\n")
                 .WithImageUrl($"attachment://wait.gif")
+                .WithThumbnailUrl($"{imageUrl}")
                 .WithColor(Discord.Color.DarkerGrey)
                 .WithCurrentTimestamp()
                 .Build();

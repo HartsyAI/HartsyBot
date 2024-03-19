@@ -77,14 +77,29 @@ public class SupabaseClient
 
     public async Task<Users?> GetUserByDiscordId(string discordId)
     {
-        var response = await supabase
-            .From<Users>()
-            .Select("*") // You can specify only necessary fields instead of "*"
-            .Filter("provider_id", Operator.Equals, discordId)
-            .Single(); // Single as we expect one user
+        try
+        {
+            var response = await supabase
+                .From<Users>()
+                .Select("*")
+                .Filter("provider_id", Operator.Equals, discordId)
+                .Single();
 
-        return response;
+            if (response == null)
+            {
+                Console.WriteLine($"No user found with Discord ID: {discordId}");
+                return null;
+            }
+
+            return response;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching user by Discord ID {discordId}: {ex.Message}");
+            return null;
+        }
     }
+
 
     public async Task<Dictionary<string, object>?> GetSubStatus(string discordId)
     {
@@ -124,16 +139,6 @@ public class SupabaseClient
             .Select("*")
             .Filter("id", Operator.Equals, userId)
             .Single();
-
-            //Console.WriteLine($"Subscriptions Table # of Rows: {response.Models.Count}");
-            var templates = await supabase.From<Template>().Get();
-            Console.WriteLine($"Templates Table # of Rows: {templates.Models.Count}");
-            var prices = await supabase.From<Prices>().Get();
-            Console.WriteLine($"Prices Table # of Rows: {prices.Models.Count}");
-            var images = await supabase.From<Images>().Get();
-            Console.WriteLine($"Images Table # of Rows: {images.Models.Count}");
-            var generations = await supabase.From<Generations>().Get();
-            Console.WriteLine($"Generations Table # of Rows: {generations.Models.Count}");
 
             if (response != null)
             {
@@ -246,7 +251,24 @@ public class SupabaseClient
         }
     }
 
-    // TODO: add method to parse templates. This method should return a dict of templates with settings. 
+    public async Task<bool> UpdateUserCredit(string userId, int newCredit)
+    {
+        try
+        {
+            var response = await supabase.From<Users>()
+                                         .Where(x => x.ProviderId == userId)
+                                         .Set(x => x.Credit, newCredit)
+                                         .Update();
+
+            // Check the result of the operation
+            return response.Equals("success");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error updating user credit: {ex.Message}");
+            return false;
+        }
+    }
 
 
     [Table("users")]
