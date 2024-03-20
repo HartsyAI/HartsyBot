@@ -261,7 +261,17 @@ public class SupabaseClient
                                          .Update();
 
             // Check the result of the operation
-            return response.Equals("success");
+            Console.WriteLine(response.ResponseMessage.IsSuccessStatusCode);
+            if (response.ResponseMessage.IsSuccessStatusCode)
+            {
+                Console.WriteLine("User credit updated successfully.");
+                return true;
+            }
+            else
+            {
+                Console.WriteLine("Error updating user credit.");
+                return false;
+            }
         }
         catch (Exception ex)
         {

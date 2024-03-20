@@ -5,6 +5,7 @@ using Hartsy.Core;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.CompilerServices;
+using System.Threading.Channels;
 
 namespace HartsyBot.Core
 {
@@ -262,18 +263,17 @@ namespace HartsyBot.Core
             [Autocomplete(typeof(TemplateAutocompleteHandler))] string template,
             [Summary("additional_details", "Describe other aspects to add to the prompt.")] string description = null)
         {
+            await DeferAsync(ephemeral: true);
             var user = Context.User as SocketGuildUser;
             var userInfo = await _supabaseClient.GetUserByDiscordId(user.Id.ToString());
-            if (userInfo == null)
-            {
-                await HandleSubscriptionFailure(user);
-                return;
-            }
             var subStatus = userInfo.PlanName;
 
             // Check if the user has a valid subscription and enough credits
             if (subStatus != null && userInfo.Credit > 0)
             {
+                int credits = userInfo.Credit ?? 0;
+                bool creditUpdated = await _supabaseClient.UpdateUserCredit(user.Id.ToString(), credits);
+                await FollowupAsync($"You have {credits} GPUT. You will have {credits - 1} GPUT after this image is generated.", ephemeral: true);
                 // Add the role to the user if they do not have it
                 await AddSubRole(user, subStatus);
 
@@ -287,7 +287,7 @@ namespace HartsyBot.Core
             }
         }
 
-        private async Task AddSubRole(SocketGuildUser user, string subStatus)
+        public async Task AddSubRole(SocketGuildUser user, string subStatus)
         {
             var subRole = user.Guild.Roles.FirstOrDefault(role => role.Name.Equals(subStatus, StringComparison.OrdinalIgnoreCase));
             if (subRole != null && !user.Roles.Contains(subRole))
@@ -296,16 +296,32 @@ namespace HartsyBot.Core
             }
         }
 
-        private async Task GenerateImageWithCredits(SocketGuildUser user, string text, string template, string description, int credits)
+        public async Task GenerateImageWithCredits(SocketGuildUser user, string text, string template, string description, int credits)
         {
-            await RespondAsync($"You have {credits} credits. You will have {credits - 1} credits remaining after this generation.", ephemeral: true);
-            // Remove credit from user
-            await _supabaseClient.UpdateUserCredit(user.Id.ToString(), credits - 1);
-            var channel = Context.Channel as SocketTextChannel;
+            if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(template))
+            {
+                Console.WriteLine("Text, template, or description is null or empty in GenerateImageWithCredits.");
+                Console.WriteLine($"Text: {text}, Template: {template}");
+                return;
+            }
+
+            var guild = user.Guild;
+            var channelName = "generate";
+            var channel = guild.TextChannels.FirstOrDefault(x => x.Name == channelName);
+            if (channel == null)
+            {
+                Console.WriteLine("Channel is null before calling GenerateFromTemplate.");
+                return;
+            }
+            if (user == null)
+            {
+                Console.WriteLine("User is null before calling GenerateFromTemplate.");
+                return;
+            }
             await GenerateFromTemplate(text, template, channel, user, description);
         }
 
-        private async Task HandleSubscriptionFailure(SocketGuildUser user)
+        public async Task HandleSubscriptionFailure(SocketGuildUser user)
         {
             var embed = new EmbedBuilder()
                 .WithTitle("Access Denied")
@@ -318,8 +334,7 @@ namespace HartsyBot.Core
             var button = new ComponentBuilder()
                 .WithButton("Click to Subscribe or Add Credits", null, ButtonStyle.Link, url: "https://hartsy.ai/support")
                 .Build();
-
-            await RespondAsync(embed: embed, components: button, ephemeral: true);
+            await FollowupAsync(embed: embed, components: button, ephemeral: true);
         }
 
 
@@ -354,7 +369,6 @@ namespace HartsyBot.Core
                 .WithCurrentTimestamp()
                 .Build();
 
-            //var previewMsg = await channel.SendMessageAsync(embed: embed);
             var previewMsg = await channel.SendFileAsync(waitImageFilePath, embed: embed);
 
             // Generate the image and update the embed with each received image
@@ -365,6 +379,7 @@ namespace HartsyBot.Core
 
                 if (!string.IsNullOrEmpty(filePath))
                 {
+                    // TODO: Create a seperate method for image editing. Inclide a 2x2 grid of images.
                     // resize image to 1024x768
                     // Load the original image
                     using (var image = System.Drawing.Image.FromFile(filePath))
@@ -396,11 +411,16 @@ namespace HartsyBot.Core
                         updatedEmbed.WithColor(Discord.Color.Green);
                         updatedEmbed.WithFooter("Visit Hartsy.AI to generate more!");
 
+                        var userId = user.Id;
+                        string customId = $"regenerate:{userId}";
+                        string deleteCustomId = $"delete:{userId}";
+                        string showcaseCustomId = $"showcase:{userId}";
+                        string reportCustomId = $"report:{userId}";
                         var components = new ComponentBuilder()
-                        .WithButton("Regenerate", "regenerate", ButtonStyle.Success)
-                        .WithButton("Add to Showcase", "showcase:add", ButtonStyle.Primary)
-                        .WithButton("Report", "report:admin", ButtonStyle.Secondary, emote: new Emoji("\u26A0")) // ⚠
-                        .WithButton(" ", "delete", ButtonStyle.Danger, emote: new Emoji("\uD83D\uDDD1"))// 🗑
+                        .WithButton("Regenerate", customId, ButtonStyle.Success)
+                        .WithButton("Add to Showcase", showcaseCustomId, ButtonStyle.Primary)
+                        .WithButton("Report", reportCustomId, ButtonStyle.Secondary, emote: new Emoji("\u26A0")) // ⚠
+                        .WithButton(" ", deleteCustomId, ButtonStyle.Danger, emote: new Emoji("\uD83D\uDDD1"))// 🗑
                         .Build();
 
                         await previewMsg.ModifyAsync(m =>

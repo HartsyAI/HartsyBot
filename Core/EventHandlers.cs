@@ -77,6 +77,7 @@ namespace HartsyBot.Core
                 string sub_status = userStatus["PlanName"].ToString();
                 // get the role id from the server that matches the name of the substatus.
                 var subRole = user.Guild.Roles.FirstOrDefault(role => role.Name.Equals($"{sub_status}", StringComparison.OrdinalIgnoreCase));
+                // TODO: Use the methods I made for this. Reduce reused code.
 
                 await user.AddRoleAsync(user.Guild.GetRole(subRole.Id));
             }

@@ -3,6 +3,7 @@ using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
 using Hartsy.Core;
+using Supabase.Interfaces;
 
 namespace HartsyBot.Core
 {
@@ -12,12 +13,14 @@ namespace HartsyBot.Core
         private readonly DiscordSocketClient _client;
         private readonly Showcase _showcase;
         private readonly Commands _commands;
+        private readonly SupabaseClient _supabaseClient;
 
-        public InteractionHandlers(DiscordSocketClient client, Showcase showcase, Commands commands)
+        public InteractionHandlers(DiscordSocketClient client, Showcase showcase, Commands commands, SupabaseClient supabaseClient)
         {
             _client = client;
             _showcase = showcase;
             _commands = commands;
+            _supabaseClient = supabaseClient;
         }
 
         private static readonly Dictionary<(ulong, string), DateTime> _lastInteracted = [];
@@ -117,58 +120,124 @@ namespace HartsyBot.Core
             }
         }
 
-        [ComponentInteraction("regenerate")]
-        public async Task RegenerateButtonHandler()
+        [ComponentInteraction("regenerate:*")]
+        public async Task RegenerateButtonHandler(string customId)
         {
+            if (Context.User.Id.ToString() != customId)
+            {
+                Console.WriteLine("Another user tried to click a button");
+                await RespondAsync("Error: You cannot regenerate another users image.", ephemeral: true);
+                return;
+            }
+
             if (IsOnCooldown(Context.User, "regenerate"))
             {
                 await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
                 return;
             }
-            await RespondAsync("Regenerating...",ephemeral: true);
-            // run the GenerateFromTemplate Task
+
+            if (Context.Interaction == null)
+            {
+                Console.WriteLine("Context.Interaction is null");
+                await RespondAsync("Error: Interaction context is missing.", ephemeral: true);
+                return;
+            }
+
             var interaction = Context.Interaction as SocketMessageComponent;
+            if (interaction == null)
+            {
+                Console.WriteLine("Interaction casting to SocketMessageComponent failed");
+                await RespondAsync("Error: Interaction casting issue.", ephemeral: true);
+                return;
+            }
+
             var message = interaction.Message;
-            // Get the first embed
+            if (message == null)
+            {
+                Console.WriteLine("Interaction.Message is null");
+                await RespondAsync("Error: Message context is missing.", ephemeral: true);
+                return;
+            }
+
+            if (!message.Embeds.Any())
+            {
+                Console.WriteLine("Message embeds are empty");
+                await RespondAsync("Error: No embeds found in the message.", ephemeral: true);
+                return;
+            }
+
             var embed = message.Embeds.First();
+            string embedDescription = embed.Description ?? "";
+            Console.WriteLine($"Embed Description: {embedDescription}");
 
-            // Embed description
-            string embedDescription = embed.Description;
-
-            // Regular expression patterns to extract text, description, and template
+            // Regular expression checks
             var textPattern = @"\*\*Text:\*\*\s*(.+?)\n\n";
             var descriptionPattern = @"\*\*Extra Description:\*\*\s*(.+?)\n\n";
             var templatePattern = @"\n\n\*\*Template Used:\*\*\s*(.+?)\n\n";
 
-            // Match and extract information using Regex
             var textMatch = Regex.Match(embedDescription, textPattern);
             var descriptionMatch = Regex.Match(embedDescription, descriptionPattern);
             var templateMatch = Regex.Match(embedDescription, templatePattern);
 
-            // Extracted values
             string text = textMatch.Groups[1].Value.Trim();
             string description = descriptionMatch.Groups[1].Value.Trim();
             string template = templateMatch.Groups[1].Value.Trim();
 
             var channel = Context.Channel as SocketTextChannel;
-            var user = (SocketGuildUser)Context.User;
-            await _commands.GenerateFromTemplate(text, template, channel, user, description);
-            // TODO: Break up the generate_logo command into smaller functions so that we can call them here
+            if (channel == null)
+            {
+                Console.WriteLine("Channel casting to SocketTextChannel failed");
+                await RespondAsync("Error: Channel casting issue.", ephemeral: true);
+                return;
+            }
 
+            var user = Context.User as SocketGuildUser;
+            if (user == null)
+            {
+                Console.WriteLine("User casting to SocketGuildUser failed");
+                await RespondAsync("Error: User casting issue.", ephemeral: true);
+                return;
+            }
+
+            var userInfo = await _supabaseClient.GetUserByDiscordId(user.Id.ToString());
+            if (userInfo == null)
+            {
+                Console.WriteLine("userInfo is null - User not found in database.");
+                await _commands.HandleSubscriptionFailure(user);
+                return;
+            }
+
+            var subStatus = userInfo.PlanName;
+            if (subStatus == null || userInfo.Credit <= 0)
+            {
+                Console.WriteLine($"Subscription status or credit issue. Status: {subStatus}, Credits: {userInfo.Credit}");
+                await _commands.HandleSubscriptionFailure(user);
+                return;
+            }
+            int credits = userInfo.Credit ?? 0;
+            bool creditUpdated = await _supabaseClient.UpdateUserCredit(user.Id.ToString(), credits - 1);
+
+            await RespondAsync($"You have {credits} GPUT. You will have {credits - 1} GPUT after this image is generated.", ephemeral: true);
+            await _commands.GenerateImageWithCredits(user, text, template, description, userInfo.Credit.Value);
         }
 
-        [ComponentInteraction("delete")]
-        public async Task DeleteButtonHandler()
+
+        [ComponentInteraction("delete:*")]
+        public async Task DeleteButtonHandler(string customId)
         {
             if (IsOnCooldown(Context.User, "delete"))
             {
                 await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
                 return;
             }
+            if (Context.User.Id.ToString() != customId)
+            {
+                Console.WriteLine("Another user tried to click a button");
+                await RespondAsync("Error: You cannot delete another users image.", ephemeral: true);
+                return;
+            }
 
-            // TODO: Make it so only the user who sent the message can delete it
-
-            await DeferAsync(); // Defer the response
+            await DeferAsync();
 
             // Delete the original message
             await (Context.Interaction as SocketMessageComponent)?.Message.DeleteAsync();
@@ -178,7 +247,7 @@ namespace HartsyBot.Core
         }
 
         [ComponentInteraction("showcase:*")]
-        public async Task ShowcaseButtonHandler()
+        public async Task ShowcaseButtonHandler(string customId)
         {
             if (IsOnCooldown(Context.User, "showcase"))
             {
@@ -186,26 +255,28 @@ namespace HartsyBot.Core
                 return;
             }
 
-            // TODO: Make it so only the user who sent the message can showcase it
+            if (Context.User.Id.ToString() != customId)
+            {
+                Console.WriteLine("Another user tried to click a button");
+                await RespondAsync("Error: You cannot Showcase another users image.", ephemeral: true);
+                return;
+            }
 
-            Console.WriteLine("Handling showcase interaction."); // Log the beginning of the interaction
+            Console.WriteLine("Handling showcase interaction.");
             await DeferAsync(); // Defer the response
 
             var client = Context.Client as DiscordSocketClient;
             if (client == null)
             {
-                Console.WriteLine("Discord client not available."); // Log the client availability issue
+                Console.WriteLine("Discord client not available.");
                 await FollowupAsync("Error: Discord client not available.", ephemeral: true);
                 return;
             }
-
-            //var originalMessage = await Context.Channel.GetMessageAsync(numericMessageId) as IUserMessage;
-            //var originalMessage = await Context.Channel.GetMessageAsync(Context.Interaction.Id) as IUserMessage;
             var originalMessage = (Context.Interaction as SocketMessageComponent)?.Message as IUserMessage;
 
             if (originalMessage == null)
             {
-                Console.WriteLine("Original message not found."); // Log that the original message was not found
+                Console.WriteLine("Original message not found.");
                 await FollowupAsync("Original message not found.", ephemeral: true);
                 return;
             }
@@ -213,12 +284,12 @@ namespace HartsyBot.Core
             var embed = originalMessage.Embeds.FirstOrDefault();
             if (embed == null || string.IsNullOrEmpty(embed.Image?.Url))
             {
-                Console.WriteLine("No image found in the original message."); // Log that no image was found
+                Console.WriteLine("No image found in the original message.");
                 await FollowupAsync("No image found in the original message.", ephemeral: true);
                 return;
             }
 
-            Console.WriteLine("Calling ShowcaseImageAsync."); // Log that we're calling the ShowcaseImageAsync method
+            Console.WriteLine("Calling ShowcaseImageAsync.");
             await _showcase.ShowcaseImageAsync(Context.Guild, embed.Image.Value.Url, Context.User);
             await FollowupAsync("Image added to the showcase!", ephemeral: true);
         }
