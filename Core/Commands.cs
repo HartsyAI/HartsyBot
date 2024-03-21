@@ -278,12 +278,14 @@ namespace HartsyBot.Core
                 await AddSubRole(user, subStatus);
 
                 // Proceed with image generation
-                await GenerateImageWithCredits(user, text, template, description, userInfo.Credit ?? 0);
+                
+                await GenerateImageWithCredits(Context, text, template, description);
             }
             else
             {
                 // Handle the lack of subscription or insufficient credits
-                await HandleSubscriptionFailure(user);
+
+                await HandleSubscriptionFailure(Context.Interaction);
             }
         }
 
@@ -296,18 +298,17 @@ namespace HartsyBot.Core
             }
         }
 
-        public async Task GenerateImageWithCredits(SocketGuildUser user, string text, string template, string description, int credits)
+        public async Task GenerateImageWithCredits(SocketInteractionContext interaction, string text, string template, string description)
         {
+
+            var user = interaction.User as SocketGuildUser;
             if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(template))
             {
                 Console.WriteLine("Text, template, or description is null or empty in GenerateImageWithCredits.");
                 Console.WriteLine($"Text: {text}, Template: {template}");
                 return;
             }
-
-            var guild = user.Guild;
-            var channelName = "generate";
-            var channel = guild.TextChannels.FirstOrDefault(x => x.Name == channelName);
+            var channel = interaction.Channel as SocketTextChannel;
             if (channel == null)
             {
                 Console.WriteLine("Channel is null before calling GenerateFromTemplate.");
@@ -321,7 +322,7 @@ namespace HartsyBot.Core
             await GenerateFromTemplate(text, template, channel, user, description);
         }
 
-        public async Task HandleSubscriptionFailure(SocketGuildUser user)
+        public async Task HandleSubscriptionFailure(SocketInteraction interaction)
         {
             var embed = new EmbedBuilder()
                 .WithTitle("Access Denied")
@@ -334,7 +335,7 @@ namespace HartsyBot.Core
             var button = new ComponentBuilder()
                 .WithButton("Click to Subscribe or Add Credits", null, ButtonStyle.Link, url: "https://hartsy.ai/support")
                 .Build();
-            await FollowupAsync(embed: embed, components: button, ephemeral: true);
+            await interaction.FollowupAsync(embed: embed, components: button, ephemeral: true);
         }
 
 

@@ -24,7 +24,7 @@ namespace HartsyBot.Core
         }
 
         private static readonly Dictionary<(ulong, string), DateTime> _lastInteracted = [];
-        private static readonly TimeSpan Cooldown = TimeSpan.FromSeconds(30); // 30 seconds cooldown
+        private static readonly TimeSpan Cooldown = TimeSpan.FromSeconds(10); // 10 seconds cooldown
 
         private static bool IsOnCooldown(SocketUser user, string command)
         {
@@ -123,23 +123,24 @@ namespace HartsyBot.Core
         [ComponentInteraction("regenerate:*")]
         public async Task RegenerateButtonHandler(string customId)
         {
+            await DeferAsync();
             if (Context.User.Id.ToString() != customId)
             {
                 Console.WriteLine("Another user tried to click a button");
-                await RespondAsync("Error: You cannot regenerate another users image.", ephemeral: true);
+                await FollowupAsync("Error: You cannot regenerate another users image.", ephemeral: true);
                 return;
             }
 
             if (IsOnCooldown(Context.User, "regenerate"))
             {
-                await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
+                await FollowupAsync ("You are on cooldown. Please wait before trying again.", ephemeral: true);
                 return;
             }
 
             if (Context.Interaction == null)
             {
                 Console.WriteLine("Context.Interaction is null");
-                await RespondAsync("Error: Interaction context is missing.", ephemeral: true);
+                await FollowupAsync("Error: Interaction context is missing.", ephemeral: true);
                 return;
             }
 
@@ -147,7 +148,7 @@ namespace HartsyBot.Core
             if (interaction == null)
             {
                 Console.WriteLine("Interaction casting to SocketMessageComponent failed");
-                await RespondAsync("Error: Interaction casting issue.", ephemeral: true);
+                await FollowupAsync("Error: Interaction casting issue.", ephemeral: true);
                 return;
             }
 
@@ -155,20 +156,19 @@ namespace HartsyBot.Core
             if (message == null)
             {
                 Console.WriteLine("Interaction.Message is null");
-                await RespondAsync("Error: Message context is missing.", ephemeral: true);
+                await FollowupAsync("Error: Message context is missing.", ephemeral: true);
                 return;
             }
 
             if (!message.Embeds.Any())
             {
                 Console.WriteLine("Message embeds are empty");
-                await RespondAsync("Error: No embeds found in the message.", ephemeral: true);
+                await FollowupAsync("Error: No embeds found in the message.", ephemeral: true);
                 return;
             }
 
             var embed = message.Embeds.First();
             string embedDescription = embed.Description ?? "";
-            Console.WriteLine($"Embed Description: {embedDescription}");
 
             // Regular expression checks
             var textPattern = @"\*\*Text:\*\*\s*(.+?)\n\n";
@@ -187,7 +187,7 @@ namespace HartsyBot.Core
             if (channel == null)
             {
                 Console.WriteLine("Channel casting to SocketTextChannel failed");
-                await RespondAsync("Error: Channel casting issue.", ephemeral: true);
+                await FollowupAsync("Error: Channel casting issue.", ephemeral: true);
                 return;
             }
 
@@ -195,7 +195,7 @@ namespace HartsyBot.Core
             if (user == null)
             {
                 Console.WriteLine("User casting to SocketGuildUser failed");
-                await RespondAsync("Error: User casting issue.", ephemeral: true);
+                await FollowupAsync("Error: User casting issue.", ephemeral: true);
                 return;
             }
 
@@ -203,7 +203,7 @@ namespace HartsyBot.Core
             if (userInfo == null)
             {
                 Console.WriteLine("userInfo is null - User not found in database.");
-                await _commands.HandleSubscriptionFailure(user);
+                await _commands.HandleSubscriptionFailure(Context.Interaction);
                 return;
             }
 
@@ -211,14 +211,14 @@ namespace HartsyBot.Core
             if (subStatus == null || userInfo.Credit <= 0)
             {
                 Console.WriteLine($"Subscription status or credit issue. Status: {subStatus}, Credits: {userInfo.Credit}");
-                await _commands.HandleSubscriptionFailure(user);
+                await _commands.HandleSubscriptionFailure(Context.Interaction);
                 return;
             }
             int credits = userInfo.Credit ?? 0;
             bool creditUpdated = await _supabaseClient.UpdateUserCredit(user.Id.ToString(), credits - 1);
 
-            await RespondAsync($"You have {credits} GPUT. You will have {credits - 1} GPUT after this image is generated.", ephemeral: true);
-            await _commands.GenerateImageWithCredits(user, text, template, description, userInfo.Credit.Value);
+            await FollowupAsync($"You have {credits} GPUT. You will have {credits - 1} GPUT after this image is generated.", ephemeral: true);
+            await _commands.GenerateImageWithCredits(Context, text, template, description);
         }
 
 

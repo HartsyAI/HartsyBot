@@ -45,7 +45,14 @@ namespace HartsyBot.Core
                 // Open the image file
                 using var stream = new FileStream(imagePath, FileMode.Open);
                 // Message to be sent, welcoming the user who joined
-                string welcomeMessage = $"{user.Mention}, welcome to the **Hartsy.AI** Discord Server! Check out the #rules channel.";
+                var rulesChannel = user.Guild.Channels.FirstOrDefault(c => c.Name.Equals("rules", StringComparison.OrdinalIgnoreCase)) as SocketTextChannel;
+                ulong rulesChannelId = rulesChannel.Id;
+                var generateChannel = user.Guild.Channels.FirstOrDefault(c => c.Name.Equals("generate", StringComparison.OrdinalIgnoreCase)) as SocketTextChannel;
+                ulong generateChannelId = generateChannel.Id;
+
+                string welcomeMessage = $"{user.Mention}, welcome to the **Hartsy.AI** Discord Server! Check out the <#{rulesChannelId}> channel. " +
+                    $"Use our custom Disocrd bot to generate images. The bot will automatically check your sub status and deduct your GPUTs from your Hartsy account. " +
+                    $"Check out the <#{generateChannelId}> channel once you have read the rules.";
 
                 // Send the image along with the welcome message
                 await welcomeChannel.SendFileAsync(stream, "welcome.png", welcomeMessage);
