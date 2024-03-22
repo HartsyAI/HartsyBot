@@ -24,7 +24,7 @@ namespace HartsyBot.Core
         }
 
         private static readonly Dictionary<(ulong, string), DateTime> _lastInteracted = [];
-        private static readonly TimeSpan Cooldown = TimeSpan.FromSeconds(10); // 10 seconds cooldown
+        private static readonly TimeSpan Cooldown = TimeSpan.FromSeconds(3); // 3 seconds cooldown
 
         private static bool IsOnCooldown(SocketUser user, string command)
         {
@@ -203,7 +203,7 @@ namespace HartsyBot.Core
             if (userInfo == null)
             {
                 Console.WriteLine("userInfo is null - User not found in database.");
-                await _commands.HandleSubscriptionFailure(Context.Interaction);
+                await _commands.HandleSubscriptionFailure(Context);
                 return;
             }
 
@@ -211,7 +211,7 @@ namespace HartsyBot.Core
             if (subStatus == null || userInfo.Credit <= 0)
             {
                 Console.WriteLine($"Subscription status or credit issue. Status: {subStatus}, Credits: {userInfo.Credit}");
-                await _commands.HandleSubscriptionFailure(Context.Interaction);
+                await _commands.HandleSubscriptionFailure(Context);
                 return;
             }
             int credits = userInfo.Credit ?? 0;
@@ -322,22 +322,49 @@ namespace HartsyBot.Core
         }
 
         [ComponentInteraction("report:*")]
-        public async Task ReportButtonHandler()
+        public async Task ReportButtonHandler(string messageId)
         {
-            if (IsOnCooldown(Context.User, "report"))
+            var user = Context.User as SocketGuildUser;
+            var guild = Context.Guild;
+
+            if (IsOnCooldown(user, "report"))
             {
                 await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
                 return;
             }
-            // TODO: disable button so it cannot be reported twice
-            await DeferAsync();
-            // disable the button
 
-            // Send a follow-up message to the user
-            await FollowupAsync("Reported to admins.", ephemeral: true);
+            var reportedMessage = await Context.Channel.GetMessageAsync(Convert.ToUInt64(messageId));
+            var staffChannel = guild.TextChannels.FirstOrDefault(c => c.Name == "staff-chat-🔒");
 
-            // TODO: Implement the actual reporting logic
+            if (reportedMessage != null && staffChannel != null)
+            {
+                var embed = new EmbedBuilder()
+                    .WithTitle("Reported Message")
+                    .WithDescription($"A message has been reported by {user.Mention}.")
+                    .AddField("Reported by", user.Mention, true)
+                    .AddField("Message Link", $"[Jump to message]({reportedMessage.GetJumpUrl()})", true)
+                    .WithColor(Color.Red)
+                    .WithTimestamp(DateTimeOffset.Now)
+                    .Build();
+
+                // Send a detailed report to the staff channel
+                await staffChannel.SendMessageAsync(embed: embed);
+
+                // Disable the button on the reported message
+                var component = new ComponentBuilder()
+                    .WithButton("Reported", "report", ButtonStyle.Danger, disabled: true)
+                    .Build();
+                await (reportedMessage as IUserMessage)?.ModifyAsync(msg => msg.Components = component);
+
+                // Acknowledge the report in the original channel
+                await RespondAsync("This message has been reported to the staff.", ephemeral: false);
+            }
+            else
+            {
+                await RespondAsync("Failed to report the message. Please try again or contact an admin.", ephemeral: true);
+            }
         }
+
 
         [ComponentInteraction("link_account")]
         public async Task LinkAccountButtonHandler()
