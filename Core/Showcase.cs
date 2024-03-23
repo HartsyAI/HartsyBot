@@ -11,23 +11,28 @@ namespace Hartsy.Core
         {
             _client = client;
         }
+
+        /// <summary>Showcases an image in the showcase channel. This method is used to display
+        /// images in the showcase channel. It creates a new message in the showcase</summary>
+        /// <param name="guild">The guild where the showcase channel is located.</param>
+        /// <param name="imageUrl">The URL of the image to showcase.</param>
+        /// <param name="user">The user who submitted the image.</param>
+        /// >returns>A Task that represents the asynchronous operation of showcasing an image.</returns>
         public async Task ShowcaseImageAsync(IGuild guild, string imageUrl, IUser user)
         {
-            Console.WriteLine($"ShowcaseImageAsync called with image URL: {imageUrl}"); // Log the start of the method
-
             var channels = await guild.GetChannelsAsync();
             var showcaseChannel = channels.FirstOrDefault(x => x.Name == "showcase") as ITextChannel;
             if (showcaseChannel == null)
             {
-                Console.WriteLine("Showcase channel not found."); // Log that the showcase channel was not found
+                Console.WriteLine("Showcase channel not found.");
                 return;
             }
 
             var components = new ComponentBuilder()
-                .WithButton("Vote", customId: "vote:up", style: ButtonStyle.Success, emote: new Emoji("\uD83D\uDC4D")) // 👍
-                .WithButton("Vote", customId: "vote:down", style: ButtonStyle.Danger, emote: new Emoji("\uD83D\uDC4E")) // 👎
+                .WithButton("Up Vote", customId: "vote:up", style: ButtonStyle.Success, emote: new Emoji("\uD83D\uDC4D")) // 👍
                 .WithButton("Report", customId: "report:admin", style: ButtonStyle.Secondary, emote: new Emoji("\u26A0")) // ⚠
-                .WithButton(" ", customId: $"delete:{user.Id}", style: ButtonStyle.Secondary, emote: new Emoji("\uD83D\uDDD1")); // 🗑
+                .WithButton(" ", customId: $"delete:{user.Id}", style: ButtonStyle.Danger, emote: new Emoji("\uD83D\uDDD1")) // 🗑
+                .Build();
 
             var embed = new EmbedBuilder()
                 .WithTitle("Showcase Image")
@@ -35,27 +40,23 @@ namespace Hartsy.Core
                 .WithImageUrl(imageUrl)
                 .WithThumbnailUrl(user.GetAvatarUrl() ?? user.GetDefaultAvatarUrl())
                 .AddField("Upvotes", "None", true)
-                .AddField("Downvotes", "None", true)
                 .WithFooter("Total Votes: 0")
                 .Build();
 
-            Console.WriteLine("Sending message to showcase channel."); // Log that we're sending a message
             var message = await showcaseChannel.SendMessageAsync(embed: embed);
-            await message.ModifyAsync(msg => msg.Components = components.Build());
-            Console.WriteLine("Message sent and components modified.");
+            await message.ModifyAsync(msg => msg.Components = components);
             await showcaseChannel.CreateThreadAsync($"Discuss Showcase by {user.Username}", autoArchiveDuration: ThreadArchiveDuration.OneDay, message: message);
         }
 
         /// <summary> Updates the vote count for a showcased image. This method handles user votes on images
-        /// displayed in the showcase channel. It ensures users can vote for or against images,
+        /// displayed in the showcase channel. It ensures users can vote for images,
         /// and that they can only vote once per image. It modifies the embed associated with the image
         /// to reflect the current vote counts and updates the message to show the latest votes.</summary>
         /// <param name="channel">The message channel where the voting message resides.</param>
         /// <param name="messageId">The ID of the message being voted on.</param>
         /// <param name="user">The user who is voting.</param>
-        /// <param name="voteType">The type of vote being cast. Should be "upvote" or "downvote".</param>
         /// <returns>A Task that represents the asynchronous operation of updating the vote on a message.</returns>
-        public async Task UpdateVoteAsync(IMessageChannel channel, ulong messageId, IUser user, string voteType)
+        public async Task UpdateVoteAsync(IMessageChannel channel, ulong messageId, IUser user)
         {
             var message = await channel.GetMessageAsync(messageId) as IUserMessage;
             if (message == null) return;
@@ -65,33 +66,55 @@ namespace Hartsy.Core
 
             var builder = embed.ToEmbedBuilder();
             var upvotesField = builder.Fields.FirstOrDefault(f => f.Name == "Upvotes");
-            var downvotesField = builder.Fields.FirstOrDefault(f => f.Name == "Downvotes");
 
             var upvotes = upvotesField != null ? upvotesField.Value.ToString().Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(v => v.Trim()).ToList() : new List<string>();
-            var downvotes = downvotesField != null ? downvotesField.Value.ToString().Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(v => v.Trim()).ToList() : new List<string>();
 
-            // Remove "None" if it exists
             upvotes.Remove("None");
-            downvotes.Remove("None");
-
-            // Remove previous votes (if any)
             upvotes.RemoveAll(vote => vote == user.Username);
-            downvotes.RemoveAll(vote => vote == user.Username);
+            upvotes.Add(user.Username);
 
-            // Add new vote
-            if (voteType == "upvote") upvotes.Add(user.Username);
-            if (voteType == "downvote") downvotes.Add(user.Username);
-
-            // If lists are empty after removing/adding votes, add "None" back
-            if (!upvotes.Any()) upvotes.Add("None");
-            if (!downvotes.Any()) downvotes.Add("None");
-
-            // Update embed fields
             builder.Fields[0].WithIsInline(true).WithValue(string.Join(", ", upvotes));
-            builder.Fields[1].WithIsInline(true).WithValue(string.Join(", ", downvotes));
-            builder.WithFooter($"Total Votes: {upvotes.Count(upvote => upvote != "None") - downvotes.Count(downvote => downvote != "None")}");
+            builder.WithFooter($"Total Votes: {upvotes.Count(upvote => upvote != "None")}");
 
             await message.ModifyAsync(msg => msg.Embed = builder.Build());
+
+            // If upvotes reach 5, send to "top-hartists" channel
+            if (upvotes.Count(upvote => upvote != "None") >= 5)
+            {
+                var channelGuild = message.Channel as SocketGuildChannel;
+                var guild = channelGuild.Guild;
+                await SendToTopHartists(guild, message);
+            }
+        }
+
+        /// <summary>Sends the message to the top-hartists channel when an image reaches 5 upvotes.</summary>
+        /// <param name="guild"></param>
+        /// <param name="message"></param>
+        /// <returns></returns>
+        private async Task SendToTopHartists(IGuild guild, IUserMessage message)
+        {
+            var channels = await guild.GetChannelsAsync();
+            var topHartistsChannel = channels.FirstOrDefault(x => x.Name == "top-hartists") as ITextChannel;
+            if (topHartistsChannel == null)
+            {
+                Console.WriteLine("Top-Hartists channel not found.");
+                return;
+            }
+
+            var iEmbed = message.Embeds.FirstOrDefault();
+            if (iEmbed != null)
+            {
+                var embedBuilder = new EmbedBuilder()
+                    .WithTitle(iEmbed.Title)
+                    .WithDescription(iEmbed.Description)
+                    .WithFooter(footer => footer.Text = iEmbed.Footer?.Text)
+                    .WithImageUrl(iEmbed.Image?.Url)
+                    .WithThumbnailUrl(iEmbed.Thumbnail?.Url)
+                    .Build();
+
+                await topHartistsChannel.SendMessageAsync("🌟 A new top artist has been selected! 🌟", embed: embedBuilder);
+            }
+
         }
     }
 }

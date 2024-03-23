@@ -258,7 +258,7 @@ namespace HartsyBot.Core
             if (Context.User.Id.ToString() != customId)
             {
                 Console.WriteLine("Another user tried to click a button");
-                await RespondAsync("Error: You cannot Showcase another users image.", ephemeral: true);
+                await RespondAsync("Error: You cannot Showcase another user's image.", ephemeral: true);
                 return;
             }
 
@@ -289,6 +289,26 @@ namespace HartsyBot.Core
                 return;
             }
 
+            // Disable the "Showcase" button
+            var componentBuilder = new ComponentBuilder();
+            foreach (var actionRow in originalMessage.Components)
+            {
+                if (actionRow is ActionRowComponent actionRowComponent)
+                {
+                    foreach (var innerComponent in actionRowComponent.Components)
+                    {
+                        if (innerComponent is ButtonComponent buttonComponent)
+                        {
+                            bool isDisabled = buttonComponent.CustomId == $"showcase:{customId}";
+                            componentBuilder.WithButton(buttonComponent.Label, buttonComponent.CustomId, buttonComponent.Style, buttonComponent.Emote, url: null, isDisabled);
+                        }
+                    }
+                }
+            }
+
+            // Update the original message with the modified components
+            await originalMessage.ModifyAsync(msg => msg.Components = componentBuilder.Build());
+
             Console.WriteLine("Calling ShowcaseImageAsync.");
             await _showcase.ShowcaseImageAsync(Context.Guild, embed.Image.Value.Url, Context.User);
             await FollowupAsync("Image added to the showcase!", ephemeral: true);
@@ -308,11 +328,11 @@ namespace HartsyBot.Core
             switch (customId)
             {
                 case "up":
-                    await _showcase.UpdateVoteAsync(channel, messageId, Context.User, "upvote");
+                    await _showcase.UpdateVoteAsync(channel, messageId, Context.User);
                     await RespondAsync("You upvoted this image!", ephemeral: true);
                     break;
                 case "down":
-                    await _showcase.UpdateVoteAsync(channel, messageId, Context.User, "downvote");
+                    await _showcase.UpdateVoteAsync(channel, messageId, Context.User);
                     await RespondAsync("You downvoted this image!", ephemeral: true);
                     break;
                 default:
