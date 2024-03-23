@@ -85,7 +85,6 @@ namespace HartsyBot
                 .AddSingleton<InteractionHandlers>()
                 .AddSingleton<TemplateAutocompleteHandler>()
                 .AddSingleton<SupabaseClient>()
-                .AddSingleton<RunpodAPI>()
                 .AddSingleton<StableSwarmAPI>()
                 .AddSingleton<Showcase>()
                 .AddSingleton<Commands>()
