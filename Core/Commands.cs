@@ -283,7 +283,7 @@ namespace HartsyBot.Core
             }
         }
 
-        [SlashCommand("generate", "Generate an image from a prompt")]
+        [SlashCommand("generate", "Generate an image. THIS WILL USE GPUTs")]
         public async Task ImageGenerationCommand(
             [Summary("text", "The text you want to appear in the image.")] string text,
             [Summary("template", "Choose a template for the image.")]
