@@ -322,7 +322,7 @@ namespace HartsyBot.Core
         }
 
         [ComponentInteraction("report:*")]
-        public async Task ReportButtonHandler(string messageId)
+        public async Task ReportButtonHandler(string userId)
         {
             var user = Context.User as SocketGuildUser;
             var guild = Context.Guild;
@@ -332,17 +332,19 @@ namespace HartsyBot.Core
                 await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
                 return;
             }
-
-            var reportedMessage = await Context.Channel.GetMessageAsync(Convert.ToUInt64(messageId));
+            var message = (Context.Interaction as SocketMessageComponent)?.Message;
+            var GetEmbed = message?.Embeds.FirstOrDefault();
             var staffChannel = guild.TextChannels.FirstOrDefault(c => c.Name == "staff-chat-🔒");
 
-            if (reportedMessage != null && staffChannel != null)
+
+            if (message != null && staffChannel != null)
             {
                 var embed = new EmbedBuilder()
                     .WithTitle("Reported Message")
-                    .WithDescription($"A message has been reported by {user.Mention}.")
+                    .WithDescription($"A message has been reported by {user.Mention}. " +
+                    $"\n\n<@{userId}> may have created an image that breaks the community rules. A mod needs to look at this ASAP!")
                     .AddField("Reported by", user.Mention, true)
-                    .AddField("Message Link", $"[Jump to message]({reportedMessage.GetJumpUrl()})", true)
+                    .AddField("Message Link", $"[Jump to message]({message.GetJumpUrl()})", true)
                     .WithColor(Color.Red)
                     .WithTimestamp(DateTimeOffset.Now)
                     .Build();
@@ -354,10 +356,22 @@ namespace HartsyBot.Core
                 var component = new ComponentBuilder()
                     .WithButton("Reported", "report", ButtonStyle.Danger, disabled: true)
                     .Build();
-                await (reportedMessage as IUserMessage)?.ModifyAsync(msg => msg.Components = component);
+                await (message as IUserMessage)?.ModifyAsync(msg => msg.Components = component);
 
-                // Acknowledge the report in the original channel
-                await RespondAsync("This message has been reported to the staff.", ephemeral: false);
+                var response = new EmbedBuilder()
+                    .WithTitle("Message Reported")
+                    .WithDescription($"{user.Mention}, Thank you for reporting this message. Our community's safety and integrity are of utmost importance to us.")
+                    .AddField("Report Received", "Your report has been successfully submitted to our staff team.")
+                    .AddField("Next Steps", "A staff member will review the reported content shortly. If they determine that it violates our community rules, " +
+                    "appropriate actions will be taken to address the issue. Deletion of the post has been disabled while staff looks into the issue.")
+                    .WithFooter("Thank you for helping to maintain a safe and respectful environment. If you have any further information please contact a mod.")
+                    .WithColor(Discord.Color.Gold)
+                    .WithCurrentTimestamp()
+                    .Build();
+
+                // Send the embed in the original channel
+                await RespondAsync(embed: response, ephemeral: true);
+
             }
             else
             {

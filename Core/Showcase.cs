@@ -27,7 +27,7 @@ namespace Hartsy.Core
                 .WithButton("Vote", customId: "vote:up", style: ButtonStyle.Success, emote: new Emoji("\uD83D\uDC4D")) // 👍
                 .WithButton("Vote", customId: "vote:down", style: ButtonStyle.Danger, emote: new Emoji("\uD83D\uDC4E")) // 👎
                 .WithButton("Report", customId: "report:admin", style: ButtonStyle.Secondary, emote: new Emoji("\u26A0")) // ⚠
-                .WithButton(" ", customId: "delete", style: ButtonStyle.Secondary, emote: new Emoji("\uD83D\uDDD1")); // 🗑
+                .WithButton(" ", customId: $"delete:{user.Id}", style: ButtonStyle.Secondary, emote: new Emoji("\uD83D\uDDD1")); // 🗑
 
             var embed = new EmbedBuilder()
                 .WithTitle("Showcase Image")
