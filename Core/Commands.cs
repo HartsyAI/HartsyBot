@@ -3,6 +3,8 @@ using Discord.WebSocket;
 using Discord;
 using Hartsy.Core;
 using System.Drawing;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Processing;
 
 namespace HartsyBot.Core
 {
@@ -125,13 +127,13 @@ namespace HartsyBot.Core
         {
             await DeferAsync(ephemeral: true);
             // if additional details is over 15 characters long, return an error message
-            if ((description != null && description.Length > 60) || text.Length > 25)
+            if ((description != null && description.Length > 80) || text.Length > 25)
             {
                 var embed = new EmbedBuilder()
                     .WithTitle("Input Length Error")
                     .WithDescription("Your input text or description exceeds the allowed character limit. Please adhere to the following constraints:" +
                                      "\n- Text must be 25 characters or less." +
-                                     "\n- Description must be 60 characters or less." +
+                                     "\n- Description must be 80 characters or less." +
                                      "\n\nAttempting to bypass or manipulate the system by tricking or 'jailbreaking' the AI is strictly prohibited " +
                                      "and against the community guidelines. Violations may result in actions taken against your account.")
                     .WithColor(Discord.Color.Red)
@@ -174,7 +176,8 @@ namespace HartsyBot.Core
 
                 // Proceed with image generation
                 
-                await GenerateImageWithCredits(Context, text, template, description);
+                //await GenerateImageWithCredits(Context, text, template, description);
+                await GenerateFromTemplate(text, template, Context.Channel as SocketTextChannel, user, description);
             }
             else
             {
@@ -192,30 +195,6 @@ namespace HartsyBot.Core
             {
                 await user.AddRoleAsync(subRole);
             }
-        }
-
-        public async Task GenerateImageWithCredits(SocketInteractionContext interaction, string text, string template, string description)
-        {
-
-            var user = interaction.User as SocketGuildUser;
-            if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(template))
-            {
-                Console.WriteLine("Text, template, or description is null or empty in GenerateImageWithCredits.");
-                Console.WriteLine($"Text: {text}, Template: {template}");
-                return;
-            }
-            var channel = interaction.Channel as SocketTextChannel;
-            if (channel == null)
-            {
-                Console.WriteLine("Channel is null before calling GenerateFromTemplate.");
-                return;
-            }
-            if (user == null)
-            {
-                Console.WriteLine("User is null before calling GenerateFromTemplate.");
-                return;
-            }
-            await GenerateFromTemplate(text, template, channel, user, description);
         }
 
         public async Task HandleSubscriptionFailure(IInteractionContext context)
@@ -248,8 +227,9 @@ namespace HartsyBot.Core
             string prompt = string.Empty;
             string TemplateInfo = string.Empty;
             string imageUrl = string.Empty;
-            string projectRoot = Directory.GetParent(Environment.CurrentDirectory).Parent.Parent.FullName;
-            string waitImageFilePath = Path.Combine(projectRoot, "images", "wait.gif");
+            //string projectRoot = Directory.GetParent(Environment.CurrentDirectory).Parent.Parent.FullName;
+            //string waitImageFilePath = Path.Combine(projectRoot, "images", "wait.gif");
+
             // Fetch the templates from the database
             var templates = await _supabaseClient.GetTemplatesAsync();
             if (templates != null && templates.TryGetValue(template, out var templateDetails))
@@ -268,13 +248,13 @@ namespace HartsyBot.Core
                 .WithTitle("Thank you for generating your image with Hartsy.AI")
                 .WithDescription($"Generating an image described by **{username}**\n\n" +
                                  $"**Template Used:** {template}\n\n`{TemplateInfo}`\n\n")
-                .WithImageUrl($"attachment://wait.gif")
+                .WithImageUrl("https://github.com/kalebbroo/Hartsy/blob/main/images/wait.gif?raw=true")
                 .WithThumbnailUrl($"{imageUrl}")
                 .WithColor(Discord.Color.DarkerGrey)
                 .WithCurrentTimestamp()
                 .Build();
 
-            var previewMsg = await channel.SendFileAsync(waitImageFilePath, embed: embed);
+            var previewMsg = await channel.SendMessageAsync(embed: embed);
 
             // Generate the image and update the embed with each received image
             await foreach (var (imageBase64, isFinal) in _stableSwarmAPI.GenerateImage(prompt))
@@ -287,20 +267,13 @@ namespace HartsyBot.Core
                     // TODO: Create a seperate method for image editing. Inclide a 2x2 grid of images.
                     // resize image to 1024x768
                     // Load the original image
-                    using (var image = System.Drawing.Image.FromFile(filePath))
+                    using (SixLabors.ImageSharp.Image image = SixLabors.ImageSharp.Image.Load(filePath))
                     {
-                        // Define a new file path for the resized image
-                        var newFilePath = Path.Combine(Path.GetDirectoryName(filePath), $"resized-{Path.GetFileName(filePath)}");
+                        // Use ImageSharp's functionality to process the image
+                        image.Mutate(x => x.Resize(1024, 768));
 
-                        // Resize the image
-                        using (var resizedImage = new Bitmap(image, new Size(1024, 768)))
-                        {
-                            // Save the resized image to the new file path
-                            resizedImage.Save(newFilePath, System.Drawing.Imaging.ImageFormat.Png);
-                        }
-
-                        // Update filePath to point to the new resized image
-                        filePath = newFilePath;
+                        // Save the processed image back to the file or a new file
+                        image.Save(filePath); // Consider saving to a new file if needed
                     }
                     // Filename used in the attachment
                     string filename = Path.GetFileName(filePath);

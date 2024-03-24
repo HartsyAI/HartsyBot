@@ -8,6 +8,8 @@ using static Postgrest.Constants;
 using System.Text.Json.Serialization;
 using System.Text.Json;
 using static SupabaseClient;
+using dotenv.net;
+using Newtonsoft.Json.Linq;
 
 public class SupabaseClient
 {
@@ -23,8 +25,17 @@ public class SupabaseClient
         var url = Environment.GetEnvironmentVariable("SUPABASE_URL");
         var key = Environment.GetEnvironmentVariable("SUPABASE_SERVICE_KEY");
         if (string.IsNullOrEmpty(url) || string.IsNullOrEmpty(key))
-        {
-            throw new InvalidOperationException("Supabase URL or KEY is not set in the environment variables.");
+            {
+            var envFilePath = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "../../../.env"));
+            Console.WriteLine("Attempting to load .env file from: " + envFilePath);
+            if (File.Exists(envFilePath))
+            {
+                var envOptions = new DotEnvOptions(envFilePaths: new[] { envFilePath });
+                DotEnv.Load(envOptions);
+                url = Environment.GetEnvironmentVariable("SUPABASE_URL");
+                key = Environment.GetEnvironmentVariable("SUPABASE_SERVICE_KEY");
+
+            }
         }
 
         var options = new SupabaseOptions

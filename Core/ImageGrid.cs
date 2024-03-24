@@ -4,33 +4,26 @@ namespace Hartsy.Core
 {
     public class ImageGrid
     {
-        public static string CreateGrid(List<string> imagePaths, string outputPath)
+        public static string CreateGrid(List<string> imageBase64s, string outputPath)
         {
-            const int imagesPerRow = 2;
-            const int imageSizeWidth = 1024;
-            const int imageSizeHeight = 768;
+            int imageSize = 1024;  // Assuming square images for simplicity
+            int gridSize = imageSize * 2;
+            using var gridImage = new Bitmap(gridSize, gridSize);
+            using var g = Graphics.FromImage(gridImage);
 
-            int gridWidth = imagesPerRow * imageSizeWidth;
-            int gridHeight = (imagePaths.Count / imagesPerRow) * imageSizeHeight;
-
-            using var gridImage = new Bitmap(gridWidth, gridHeight);
-            using (var g = Graphics.FromImage(gridImage))
+            for (int i = 0; i < imageBase64s.Count; i++)
             {
-                g.Clear(Color.Black); // Fill background if there are transparent areas
-
-                for (int i = 0; i < imagePaths.Count; i++)
-                {
-                    using var image = Image.FromFile(imagePaths[i]);
-                    int x = (i % imagesPerRow) * imageSizeWidth;
-                    int y = (i / imagesPerRow) * imageSizeHeight;
-                    g.DrawImage(image, new Rectangle(x, y, imageSizeWidth, imageSizeHeight));
-                }
+                using var imageStream = new MemoryStream(Convert.FromBase64String(imageBase64s[i]));
+                using var image = Image.FromStream(imageStream);
+                int x = (i % 2) * imageSize;
+                int y = (i / 2) * imageSize;
+                g.DrawImage(image, x, y, imageSize, imageSize);
             }
 
-            string gridImagePath = Path.Combine(outputPath, "grid.png");
-            gridImage.Save(gridImagePath, System.Drawing.Imaging.ImageFormat.Png);
+            string gridFilePath = Path.Combine(outputPath, "grid.png");
+            gridImage.Save(gridFilePath, System.Drawing.Imaging.ImageFormat.Png);
 
-            return gridImagePath;
+            return gridFilePath;
         }
     }
 }

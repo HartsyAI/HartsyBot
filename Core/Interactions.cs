@@ -227,7 +227,7 @@ namespace HartsyBot.Core
                     .Build();
 
             await FollowupAsync(embed: creditEmbed, ephemeral: true);
-            await _commands.GenerateImageWithCredits(Context, text, template, description);
+            await _commands.GenerateFromTemplate(text, template, channel, user, description);
         }
 
 
