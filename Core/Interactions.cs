@@ -217,7 +217,16 @@ namespace HartsyBot.Core
             int credits = userInfo.Credit ?? 0;
             bool creditUpdated = await _supabaseClient.UpdateUserCredit(user.Id.ToString(), credits - 1);
 
-            await FollowupAsync($"You have {credits} GPUT. You will have {credits - 1} GPUT after this image is generated.", ephemeral: true);
+            var creditEmbed = new EmbedBuilder()
+                    .WithTitle("Image Generation")
+                    .WithDescription($"You have {credits} GPUT. You will have {credits - 1} GPUT after this image is generated.")
+                    .AddField("Generate Command", "This command allows you to generate images based on the text and template you provide. " +
+                    "Each generation will use one GPUT from your account.")
+                    .WithColor(Discord.Color.Gold)
+                    .WithCurrentTimestamp()
+                    .Build();
+
+            await FollowupAsync(embed: creditEmbed, ephemeral: true);
             await _commands.GenerateImageWithCredits(Context, text, template, description);
         }
 

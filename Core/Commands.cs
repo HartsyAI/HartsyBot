@@ -124,6 +124,24 @@ namespace HartsyBot.Core
             [Summary("additional_details", "Describe other aspects to add to the prompt.")] string description = null)
         {
             await DeferAsync(ephemeral: true);
+            // if additional details is over 15 characters long, return an error message
+            if ((description != null && description.Length > 60) || text.Length > 25)
+            {
+                var embed = new EmbedBuilder()
+                    .WithTitle("Input Length Error")
+                    .WithDescription("Your input text or description exceeds the allowed character limit. Please adhere to the following constraints:" +
+                                     "\n- Text must be 25 characters or less." +
+                                     "\n- Description must be 60 characters or less." +
+                                     "\n\nAttempting to bypass or manipulate the system by tricking or 'jailbreaking' the AI is strictly prohibited " +
+                                     "and against the community guidelines. Violations may result in actions taken against your account.")
+                    .WithColor(Discord.Color.Red)
+                    .WithFooter("This is a reminder to use the system responsibly and ethically.")
+                    .WithCurrentTimestamp()
+                    .Build();
+
+                await FollowupAsync(embed: embed, ephemeral: true);
+                return;
+            }
             var user = Context.User as SocketGuildUser;
             var userInfo = await _supabaseClient.GetUserByDiscordId(user.Id.ToString());
             if (userInfo == null)
