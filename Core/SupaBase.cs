@@ -1,15 +1,10 @@
 ﻿using Postgrest.Attributes;
 using Postgrest.Models;
 using Supabase;
-using Supabase.Gotrue;
-using System;
-using System.Threading.Tasks;
 using static Postgrest.Constants;
 using System.Text.Json.Serialization;
 using System.Text.Json;
-using static SupabaseClient;
 using dotenv.net;
-using Newtonsoft.Json.Linq;
 
 public class SupabaseClient
 {
@@ -37,30 +32,12 @@ public class SupabaseClient
 
             }
         }
-
         var options = new SupabaseOptions
         {
             AutoConnectRealtime = true
         };
-
         supabase = new Supabase.Client(url, key, options);
         await supabase.InitializeAsync();
-    }
-
-    public async Task<List<Users>> GetAllUsers()
-    {
-        try
-        {
-            var response = await supabase.From<Users>().Get();
-            // If no exception is thrown, assume the call was successful
-            return response.Models ?? new List<Users>(); // Safely return the list, ensuring it's not null
-        }
-        catch (Exception ex)
-        {
-            // Log or handle exceptions here
-            Console.WriteLine($"Exception when fetching users: {ex.Message}");
-            return new List<Users>(); // Return an empty list in case of error
-        }
     }
 
     public async Task<bool> IsDiscordLinked(string discordId)
@@ -270,7 +247,6 @@ public class SupabaseClient
                                          .Where(x => x.ProviderId == userId)
                                          .Set(x => x.Credit, newCredit)
                                          .Update();
-
             // Check the result of the operation
             Console.WriteLine(response.ResponseMessage.IsSuccessStatusCode);
             if (response.ResponseMessage.IsSuccessStatusCode)

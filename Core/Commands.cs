@@ -152,9 +152,7 @@ namespace HartsyBot.Core
                 return;
             }
             var subStatus = userInfo.PlanName ?? "Member";
-            Console.WriteLine($"User: {user.Username}, Subscription: {subStatus}");
             var credits = userInfo.Credit ?? 0;
-            Console.WriteLine("Credits: " + credits);
 
             // Check if the user has a valid subscription and enough credits
             if (subStatus != null && userInfo.Credit > 0)
@@ -175,15 +173,12 @@ namespace HartsyBot.Core
                 await AddSubRole(user, subStatus);
 
                 // Proceed with image generation
-                
-                //await GenerateImageWithCredits(Context, text, template, description);
                 await GenerateFromTemplate(text, template, Context.Channel as SocketTextChannel, user, description);
             }
             else
             {
                 // Handle the lack of subscription or insufficient credits
-                Console.WriteLine("Error in ImageGenerationCommand: User does not have a valid subscription or enough credits.");
-                //await FollowupAsync("You do not have a valid subscription or enough credits to generate an image.", ephemeral: true);
+                Console.WriteLine("Warning: User does not have a valid subscription or enough credits.");
                 await HandleSubscriptionFailure(Context);
             }
         }
@@ -222,15 +217,13 @@ namespace HartsyBot.Core
             }
         }
 
-        public async Task GenerateFromTemplate(string text, string template, SocketTextChannel channel, SocketGuildUser user, string description = null)
+        public async Task GenerateFromTemplate(string text, string template, SocketTextChannel channel, 
+            SocketGuildUser user, string description = null)
         {
             string prompt = string.Empty;
             string TemplateInfo = string.Empty;
             string imageUrl = string.Empty;
-            //string projectRoot = Directory.GetParent(Environment.CurrentDirectory).Parent.Parent.FullName;
-            //string waitImageFilePath = Path.Combine(projectRoot, "images", "wait.gif");
 
-            // Fetch the templates from the database
             var templates = await _supabaseClient.GetTemplatesAsync();
             if (templates != null && templates.TryGetValue(template, out var templateDetails))
             {
@@ -242,7 +235,6 @@ namespace HartsyBot.Core
 
             var username = user.Username;
 
-            // Create a placeholder embed
             var embed = new EmbedBuilder()
                 .WithAuthor(user)
                 .WithTitle("Thank you for generating your image with Hartsy.AI")
@@ -256,69 +248,58 @@ namespace HartsyBot.Core
 
             var previewMsg = await channel.SendMessageAsync(embed: embed);
 
-            // Generate the image and update the embed with each received image
-            await foreach (var (imageBase64, isFinal) in _stableSwarmAPI.GenerateImage(prompt))
+            await foreach (var (image, isFinal) in _stableSwarmAPI.GetImages(prompt))
             {
-                Console.WriteLine($"Received image. Final: {isFinal}");
-                var filePath = await _stableSwarmAPI.ConvertAndSaveImage(imageBase64, username, previewMsg.Id, "png", isFinal);
-
-                if (!string.IsNullOrEmpty(filePath))
+                if (image == null)
                 {
-                    // TODO: Create a seperate method for image editing. Inclide a 2x2 grid of images.
-                    // resize image to 1024x768
-                    // Load the original image
-                    using (SixLabors.ImageSharp.Image image = SixLabors.ImageSharp.Image.Load(filePath))
-                    {
-                        // Use ImageSharp's functionality to process the image
-                        image.Mutate(x => x.Resize(1024, 768));
+                    continue;
+                }
+                using var ms = new MemoryStream();
+                image.SaveAsJpeg(ms);
+                ms.Position = 0;
+                var file = new FileAttachment(ms, "image_grid.jpeg");
 
-                        // Save the processed image back to the file or a new file
-                        image.Save(filePath); // Consider saving to a new file if needed
-                    }
-                    // Filename used in the attachment
-                    string filename = Path.GetFileName(filePath);
+                var updatedEmbed = previewMsg.Embeds.FirstOrDefault()?.ToEmbedBuilder() ?? new EmbedBuilder();
+                updatedEmbed.WithImageUrl($"attachment://image_grid.jpeg");
+                updatedEmbed.WithColor(Discord.Color.Green);
 
-                    var updatedEmbed = previewMsg.Embeds.FirstOrDefault()?.ToEmbedBuilder() ?? new EmbedBuilder();
-                    updatedEmbed.WithImageUrl($"attachment://{filename}");
-                    var fileAttachment = new FileAttachment(filePath);
-
-                    if (isFinal)
-                    {
-                        updatedEmbed.WithDescription($"Generated an image for **{username}**\n\n**Text:** {text}\n\n**Extra Description:** {description}" +
+                if (isFinal)
+                {
+                    updatedEmbed.WithDescription($"Generated an image for **{username}**\n\n**Text:** {text}\n\n**Extra Description:** {description}" +
                         $"\n\n**Template Used:** {template}\n\n`{TemplateInfo}`");
-                        updatedEmbed.WithColor(Discord.Color.Green);
-                        updatedEmbed.WithFooter("Visit Hartsy.AI to generate more!");
+                    updatedEmbed.WithFooter("Visit Hartsy.AI to generate more!");
 
-                        var userId = user.Id;
-                        string customId = $"regenerate:{userId}";
-                        string deleteCustomId = $"delete:{userId}";
-                        string showcaseCustomId = $"showcase:{userId}";
-                        string reportCustomId = $"report:{userId}";
-                        var components = new ComponentBuilder()
-                        .WithButton("Regenerate", customId, ButtonStyle.Success)
-                        .WithButton("Add to Showcase", showcaseCustomId, ButtonStyle.Primary)
-                        .WithButton("Report", reportCustomId, ButtonStyle.Secondary, emote: new Emoji("\u26A0")) // ⚠
-                        .WithButton(" ", deleteCustomId, ButtonStyle.Danger, emote: new Emoji("\uD83D\uDDD1"))// 🗑
-                        .Build();
-
-                        await previewMsg.ModifyAsync(m =>
-                        {
-                            m.Embed = updatedEmbed.Build();
-                            m.Attachments = new[] { fileAttachment };
-                            m.Components = components;
-                        });
-                    }
-                    else
+                    await previewMsg.ModifyAsync(m =>
                     {
-                        await previewMsg.ModifyAsync(m =>
-                        {
-                            m.Embed = updatedEmbed.Build();
-                            m.Attachments = new[] { fileAttachment };
-                        });
-                    }
-                    if (isFinal) break;  // Exit the loop if the final image has been processed
+                        m.Embed = updatedEmbed.Build();
+                        m.Attachments = new[] { file };
+                        m.Components = new Optional<MessageComponent>(GenerateComponents(user.Id).Build());
+                    });
+
+                    break; // Exit the loop after handling the final image
+                }
+                else
+                {
+                    await previewMsg.ModifyAsync(m =>
+                    {
+                        m.Embed = updatedEmbed.Build();
+                        m.Attachments = new[] { file };
+                    });
                 }
             }
+        }
+
+        private ComponentBuilder GenerateComponents(ulong userId)
+        {
+            string customId = $"regenerate:{userId}";
+            string deleteCustomId = $"delete:{userId}";
+            string showcaseCustomId = $"showcase:{userId}";
+            string reportCustomId = $"report:{userId}";
+            return new ComponentBuilder()
+                .WithButton("Regenerate", customId, ButtonStyle.Success)
+                .WithButton("Add to Showcase", showcaseCustomId, ButtonStyle.Primary)
+                .WithButton("Report", reportCustomId, ButtonStyle.Secondary, emote: new Emoji("\u26A0")) // ⚠
+                .WithButton(" ", deleteCustomId, ButtonStyle.Danger, emote: new Emoji("\uD83D\uDDD1")); // 🗑
         }
     }
 }
