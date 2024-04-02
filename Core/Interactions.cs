@@ -1,8 +1,12 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.ComponentModel;
+using System.Text.RegularExpressions;
+using System.Threading.Channels;
 using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
 using Hartsy.Core;
+using Microsoft.VisualBasic;
+using Supabase.Gotrue;
 using Supabase.Interfaces;
 
 namespace HartsyBot.Core
@@ -136,68 +140,20 @@ namespace HartsyBot.Core
                 await FollowupAsync ("You are on cooldown. Please wait before trying again.", ephemeral: true);
                 return;
             }
-
-            if (Context.Interaction == null)
+            var message = (Context.Interaction as SocketMessageComponent)?.Message;
+            if (message == null || !message.Embeds.Any())
             {
-                Console.WriteLine("Context.Interaction is null");
-                await FollowupAsync("Error: Interaction context is missing.", ephemeral: true);
-                return;
-            }
-
-            var interaction = Context.Interaction as SocketMessageComponent;
-            if (interaction == null)
-            {
-                Console.WriteLine("Interaction casting to SocketMessageComponent failed");
-                await FollowupAsync("Error: Interaction casting issue.", ephemeral: true);
-                return;
-            }
-
-            var message = interaction.Message;
-            if (message == null)
-            {
-                Console.WriteLine("Interaction.Message is null");
-                await FollowupAsync("Error: Message context is missing.", ephemeral: true);
-                return;
-            }
-
-            if (!message.Embeds.Any())
-            {
-                Console.WriteLine("Message embeds are empty");
-                await FollowupAsync("Error: No embeds found in the message.", ephemeral: true);
+                Console.WriteLine("Message or embeds are null/empty");
+                await FollowupAsync("Error: Message or embeds are missing.", ephemeral: true);
                 return;
             }
 
             var embed = message.Embeds.First();
-            string embedDescription = embed.Description ?? "";
-
-            // Regular expression checks
-            var textPattern = @"\*\*Text:\*\*\s*(.+?)\n\n";
-            var descriptionPattern = @"\*\*Extra Description:\*\*\s*(.+?)\n\n";
-            var templatePattern = @"\n\n\*\*Template Used:\*\*\s*(.+?)\n\n";
-
-            var textMatch = Regex.Match(embedDescription, textPattern);
-            var descriptionMatch = Regex.Match(embedDescription, descriptionPattern);
-            var templateMatch = Regex.Match(embedDescription, templatePattern);
-
-            string text = textMatch.Groups[1].Value.Trim();
-            string description = descriptionMatch.Groups[1].Value.Trim();
-            string template = templateMatch.Groups[1].Value.Trim();
+            var (text, description, template) = ParseEmbed(embed);
 
             var channel = Context.Channel as SocketTextChannel;
-            if (channel == null)
-            {
-                Console.WriteLine("Channel casting to SocketTextChannel failed");
-                await FollowupAsync("Error: Channel casting issue.", ephemeral: true);
-                return;
-            }
 
             var user = Context.User as SocketGuildUser;
-            if (user == null)
-            {
-                Console.WriteLine("User casting to SocketGuildUser failed");
-                await FollowupAsync("Error: User casting issue.", ephemeral: true);
-                return;
-            }
 
             var userInfo = await _supabaseClient.GetUserByDiscordId(user.Id.ToString());
             if (userInfo == null)
@@ -230,6 +186,25 @@ namespace HartsyBot.Core
             await _commands.GenerateFromTemplate(text, template, channel, user, description);
         }
 
+        private (string text, string description, string template) ParseEmbed(IEmbed embed)
+        {
+            string embedDescription = embed.Description ?? "";
+
+            // Regular expression checks
+            var textPattern = @"\*\*Text:\*\*\s*(.+?)\n\n";
+            var descriptionPattern = @"\*\*Extra Description:\*\*\s*(.+?)\n\n";
+            var templatePattern = @"\n\n\*\*Template Used:\*\*\s*(.+?)\n\n";
+
+            var textMatch = Regex.Match(embedDescription, textPattern);
+            var descriptionMatch = Regex.Match(embedDescription, descriptionPattern);
+            var templateMatch = Regex.Match(embedDescription, templatePattern);
+
+            string text = textMatch.Groups[1].Value.Trim();
+            string description = descriptionMatch.Groups[1].Value.Trim();
+            string template = templateMatch.Groups[1].Value.Trim();
+
+            return (text, description, template);
+        }
 
         [ComponentInteraction("delete:*")]
         public async Task DeleteButtonHandler(string customId)
@@ -409,13 +384,170 @@ namespace HartsyBot.Core
         }
 
 
-        [ComponentInteraction("link_account")]
-        public async Task LinkAccountButtonHandler()
+        [ComponentInteraction("yes:*")]
+        public async Task YesButtonHandler(string customId)
         {
-            if (IsOnCooldown(Context.User, "link_account"))
+            if (IsOnCooldown(Context.User, "yes"))
             {
                 await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
                 return;
+            }
+        }
+
+        [ComponentInteraction("no:*")]
+        public async Task NoButtonHandler(string customId)
+        {
+            if (IsOnCooldown(Context.User, "no"))
+            {
+                await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
+                return;
+            }
+        }
+
+        [ComponentInteraction("choose_image:*")]
+        public async Task LinkAccountButtonHandler(string customId)
+        {
+            if (IsOnCooldown(Context.User, "choose_image"))
+            {
+                await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
+                return;
+            }
+            if (Context.User is SocketGuildUser user)
+            {
+                var userInfo = await _supabaseClient.GetUserByDiscordId(user.Id.ToString());
+                if (userInfo == null)
+                {
+                    var components = new ComponentBuilder()
+                    .WithButton("Link Account", style: ButtonStyle.Link, url: "https://hartsy.ai")
+                    .Build();
+
+                    var embed = new EmbedBuilder()
+                        .WithTitle("Link Your Hartsy.AI Account")
+                        .WithDescription($"{user.Mention}, you have not linked your Discord account with your Hartsy.AI account. Make a FREE account " +
+                                                            "and log into Hartsy.AI using your Discord credentials. If you have already done that and are still having issues" +
+                                                                                                " contact an admin. This may be a bug.")
+                        .WithColor(Discord.Color.Blue)
+                        .WithTimestamp(DateTimeOffset.Now)
+                        .Build();
+
+                    await user.SendMessageAsync(embed: embed, components: components);
+                    return;
+                }
+
+                var subStatus = userInfo.PlanName;
+                if (subStatus == null)
+                {
+                    await RespondAsync("Error: Subscription status not found.", ephemeral: true);
+                    return;
+                }
+
+                try
+                {
+                    var interaction = Context.Interaction as SocketMessageComponent;
+                    string username = interaction.User.Username;
+                    ulong messageId = interaction.Message.Id;
+                    var selectMenu = new SelectMenuBuilder()
+                            .WithPlaceholder("Select an image")
+                            .AddOption("Image 1", "image_0")
+                            .AddOption("Image 2", "image_1")
+                            .AddOption("Image 3", "image_2")
+                            .AddOption("Image 4", "image_3");
+
+                    if (customId == "i2i")
+                    {
+                        selectMenu.WithCustomId($"select_image:i2i={messageId}");
+                        var selectBuilder = new ComponentBuilder()
+                            .WithSelectMenu(selectMenu);
+                        await RespondAsync("You have selected the 'Image to Image' option.", components: selectBuilder.Build(), ephemeral: true);
+                        Console.WriteLine($"User {username} Message ID: {messageId}");
+                        return;
+                    }
+                    else if (customId == "save")
+                    {
+                        selectMenu.WithCustomId($"select_image:add={messageId}");
+                        var selectBuilder = new ComponentBuilder()
+                            .WithSelectMenu(selectMenu);
+                        await RespondAsync("You have selected the 'Save' option.", components: selectBuilder.Build(), ephemeral: true);
+                        return;
+                    }
+                }
+                catch
+                {
+                    await RespondAsync("Error: Failed to send a direct message to the user.", ephemeral: true);
+                }
+            }
+        }
+
+        [ComponentInteraction("select_image:*")]
+        private async Task HandleImageSelect(string customId, string[] selections)
+        {
+            await DeferAsync();
+            var selectedValue = selections.FirstOrDefault();
+            Console.WriteLine($"Selected value: {selectedValue}");
+
+            if (!string.IsNullOrEmpty(selectedValue))
+            {
+                var parts = customId.Split('=');
+                if (parts.Length < 2) return;
+
+                var actionType = parts[0]; // Should give "i2i" or "add"
+                var messageId = parts[1]; // Should give the messageId part
+
+                var interaction = Context.Interaction as SocketMessageComponent;
+                var username = interaction.User.Username;
+                string userId = interaction.User.Id.ToString();
+
+                var filePath = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), $"../../../images/{username}/{messageId}/{selectedValue}.jpeg"));
+                // add the base 64 of the image to send to generatefromtemplate
+                var initimage = Convert.ToBase64String(File.ReadAllBytes(filePath));
+
+                if (File.Exists(filePath))
+                {
+                    if (actionType == "i2i")
+                    {
+                        var message = await Context.Channel.GetMessageAsync(Convert.ToUInt64(messageId)) as IUserMessage;
+                        var embed = message.Embeds.First();
+                        var (text, description, template) = ParseEmbed(embed);
+                        var channel = Context.Channel as SocketTextChannel;
+
+                        var user = Context.User as SocketGuildUser;
+
+                        var userInfo = await _supabaseClient.GetUserByDiscordId(user.Id.ToString());
+                        var subStatus = userInfo.PlanName;
+                        if (subStatus == null || userInfo.Credit <= 0)
+                        {
+                            Console.WriteLine($"Subscription status or credit issue. Status: {subStatus}, Credits: {userInfo.Credit}");
+                            await _commands.HandleSubscriptionFailure(Context);
+                            return;
+                        }
+                        int credits = userInfo.Credit ?? 0;
+                        bool creditUpdated = await _supabaseClient.UpdateUserCredit(user.Id.ToString(), credits - 1);
+
+                        var creditEmbed = new EmbedBuilder()
+                                .WithTitle("Image Generation")
+                                .WithDescription($"You have {credits} GPUT. You will have {credits - 1} GPUT after this image is generated.")
+                                .AddField("Generate Command", "This command allows you to generate images based on the text and template you provide. " +
+                                "Each generation will use one GPUT from your account.")
+                                .WithColor(Discord.Color.Gold)
+                                .WithCurrentTimestamp()
+                                .Build();
+
+                        await FollowupAsync(embed: creditEmbed, ephemeral: true);
+                        await _commands.GenerateFromTemplate(text, template, channel, user, description, initimage);
+                    }
+                    else if (actionType == "add")
+                    {
+                        await FollowupAsync("Image saved successfully!", ephemeral: true);
+                    }
+                }
+                else
+                {
+                    await FollowupAsync("Image not found.", ephemeral: true);
+                }
+            }
+            else
+            {
+                await FollowupAsync("No option selected.", ephemeral: true);
             }
         }
     }

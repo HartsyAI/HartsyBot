@@ -5,6 +5,10 @@ using Hartsy.Core;
 using System.Drawing;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Processing;
+using static SupabaseClient;
+using Supabase.Gotrue;
+using System.Reactive.Concurrency;
+using System.Reflection;
 
 namespace HartsyBot.Core
 {
@@ -17,6 +21,21 @@ namespace HartsyBot.Core
         {
             _supabaseClient = new SupabaseClient();
             _stableSwarmAPI = new StableSwarmAPI();
+        }
+        // make a test command
+        [SlashCommand("test", "Test the bot")]
+        public async Task TestCommand()
+        {
+            var builder = new ComponentBuilder()
+                .WithSelectMenu(new SelectMenuBuilder()
+                    .WithCustomId("select_image")
+                    .WithPlaceholder("Choose an image")
+                    .AddOption("Image 1", "image_0")
+                    .AddOption("Image 2", "image_1")
+                    .AddOption("Image 3", "image_2")
+                    .AddOption("Image 4", "image_3"));
+            await RespondAsync("Test command executed successfully!", components: builder.Build());
+
         }
 
         [SlashCommand("help", "Learn how to use the bot")]
@@ -218,7 +237,7 @@ namespace HartsyBot.Core
         }
 
         public async Task GenerateFromTemplate(string text, string template, SocketTextChannel channel, 
-            SocketGuildUser user, string description = null)
+            SocketGuildUser user, string description = null, string initimage = null)
         {
             string prompt = string.Empty;
             string TemplateInfo = string.Empty;
@@ -242,13 +261,34 @@ namespace HartsyBot.Core
                                  $"**Template Used:** {template}\n\n`{TemplateInfo}`\n\n")
                 .WithImageUrl("https://github.com/kalebbroo/Hartsy/blob/main/images/wait.gif?raw=true")
                 .WithThumbnailUrl($"{imageUrl}")
-                .WithColor(Discord.Color.DarkerGrey)
+                .WithColor(Discord.Color.Red)
                 .WithCurrentTimestamp()
                 .Build();
 
             var previewMsg = await channel.SendMessageAsync(embed: embed);
+            var payload = new Dictionary<string, object>
+                {
+                    {"prompt", prompt},
+                    {"negativeprompt", "malformed letters, repeating letters, double letters"},
+                    {"images", 1},
+                    {"batchsize", 4},
+                    {"donotsave", true},
+                    {"model", "starlightXLAnimated_v3.safetensors"},
+                    {"loras", "an0tha0ne.safetensors"},
+                    {"loraweights", 1},
+                    {"width", 1024},
+                    {"height", 768},
+                    {"cfgscale", 6.5},
+                    {"steps", 32},
+                    {"seed", -1},
+                    {"sampler", "dpmpp_3m_sde"},
+                    {"scheduler", "karras"},
+                    {"initimage", initimage},
+                    {"init_image_creativity", 0.7},
+                };
+            ulong messageId = previewMsg.Id;
 
-            await foreach (var (image, isFinal) in _stableSwarmAPI.GetImages(prompt))
+            await foreach (var (image, isFinal) in _stableSwarmAPI.GetImages(payload, username, messageId))
             {
                 if (image == null)
                 {
@@ -261,13 +301,14 @@ namespace HartsyBot.Core
 
                 var updatedEmbed = previewMsg.Embeds.FirstOrDefault()?.ToEmbedBuilder() ?? new EmbedBuilder();
                 updatedEmbed.WithImageUrl($"attachment://image_grid.jpeg");
-                updatedEmbed.WithColor(Discord.Color.Green);
+                updatedEmbed.WithColor(Discord.Color.Red);
 
                 if (isFinal)
                 {
                     updatedEmbed.WithDescription($"Generated an image for **{username}**\n\n**Text:** {text}\n\n**Extra Description:** {description}" +
                         $"\n\n**Template Used:** {template}\n\n`{TemplateInfo}`");
                     updatedEmbed.WithFooter("Visit Hartsy.AI to generate more!");
+                    updatedEmbed.WithColor(Discord.Color.Green);
 
                     await previewMsg.ModifyAsync(m =>
                     {
@@ -299,7 +340,9 @@ namespace HartsyBot.Core
                 .WithButton("Regenerate", customId, ButtonStyle.Success)
                 .WithButton("Add to Showcase", showcaseCustomId, ButtonStyle.Primary)
                 .WithButton("Report", reportCustomId, ButtonStyle.Secondary, emote: new Emoji("\u26A0")) // ⚠
-                .WithButton(" ", deleteCustomId, ButtonStyle.Danger, emote: new Emoji("\uD83D\uDDD1")); // 🗑
+                .WithButton(" ", deleteCustomId, ButtonStyle.Danger, emote: new Emoji("\uD83D\uDDD1")) // 🗑
+                .WithButton("Image2Image", "choose_image:i2i", ButtonStyle.Secondary, row: 1)
+                .WithButton("Save To Gallery", "choose_image:save", ButtonStyle.Secondary, row: 1);
         }
     }
 }

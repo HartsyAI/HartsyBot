@@ -59,7 +59,6 @@ namespace HartsyBot
             var eventHandlers = new Core.EventHandlers(_client, _interactions, supabaseClient);
             eventHandlers.RegisterHandlers();
 
-            //var token = Environment.GetEnvironmentVariable("BOT_TOKEN"); // Get the bot token from environment variables
             if (string.IsNullOrEmpty(token))
             {
                 Console.WriteLine("Bot token is null or empty. Check your .env file.");

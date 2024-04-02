@@ -64,35 +64,27 @@ namespace Hartsy.Core
             return result;
         }
 
-        private object CreateRequestObject(string prompt)
-        {
-            return new
-            {
-                session_id = Session,
-                prompt = prompt,
-                negativeprompt = "malformed letters, repeating letters, double letters",
-                images = 1,
-                batchsize = 4,
-                donotsave = true,
-                model = "starlightXLAnimated_v3.safetensors",
-                loras = "an0tha0ne.safetensors",
-                loraweights = 1,
-                width = 1024,
-                height = 768,
-                cfgscale = 5.5,
-                steps = 34,
-                seed = -1,
-                sampler = "dpmpp_3m_sde",
-                scheduler = "karras",
-            };
-        }
-
-        public async IAsyncEnumerable<(Image<Rgba32> Image, bool IsFinal)> GetImages(string prompt)
+        private async Task<Dictionary<string, object>> CreateRequestObject(Dictionary<string, object> payload)
         {
             await GetSession();
+            payload["session_id"] = Session;
+
+            // Remove all entries where the value is null
+            var keysToRemove = payload.Where(kvp => kvp.Value == null).Select(kvp => kvp.Key).ToList();
+            foreach (var key in keysToRemove)
+            {
+                payload.Remove(key);
+            }
+
+            return payload;
+        }
+
+        public async IAsyncEnumerable<(Image<Rgba32> Image, bool IsFinal)> GetImages(Dictionary<string, object> payload, string username, ulong messageId)
+        {
             var webSocket = new ClientWebSocket();
             await EnsureWebSocketConnectionAsync(webSocket);
-            var request = CreateRequestObject(prompt);
+            var request = await CreateRequestObject(payload);
+
             await SendRequestAsync(webSocket, request);
 
             var responseBuffer = new ArraySegment<byte>(new byte[8192]);
@@ -131,7 +123,7 @@ namespace Hartsy.Core
                                 if (batchIndex == 3)
                                 {
                                     batchCount++;
-                                    Image<Rgba32> preview = await HandlePreview(previewImages, batchCount);
+                                    Image<Rgba32> preview = await HandlePreview(previewImages, batchCount, username, messageId);
                                     if (preview == null)
                                     {
                                         continue;
@@ -153,7 +145,6 @@ namespace Hartsy.Core
                                 {
                                     // Safely get the value of each field, defaulting to 0 if not found
                                     statusData.TryGetValue(field, out object value);
-                                    Console.WriteLine($"{field}: {value ?? 0}");
                                 }
                             }
                         }
@@ -162,15 +153,13 @@ namespace Hartsy.Core
                         {
                             bool isFinal = true;
                             int batchIndex = Convert.ToInt32(responseData["batch_index"]);
-                            Console.WriteLine($"Contains final image for batch index {batchIndex}.");
                             string base64WithPrefix = responseData["image"].ToString();
                             string base64 = await RemovePrefix(base64WithPrefix);
                             finalImages[batchIndex] = new Dictionary<string, string> { { "base64", $"{base64}" } };
                             
                             if (batchIndex == 3)
                             {
-                                Console.WriteLine("All final images received");
-                                Image<Rgba32> final = await HandleFinal(finalImages);
+                                Image<Rgba32> final = await HandleFinal(finalImages, username, messageId);
                                 await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "All final images received", CancellationToken.None);
                                 yield return (final, isFinal);
                                 break;
@@ -213,38 +202,28 @@ namespace Hartsy.Core
         /// and the value is another dictionary containing image base64.</param>
         /// <param name="batchCount">How many batches have been processed.</param>
         /// <returns>A grid image of the preview images for the batch if count meets frequency; otherwise, null.</returns>
-        private async Task<Image<Rgba32>> HandlePreview(Dictionary<int, Dictionary<string, string>> previewImages, int batchCount)
+        private async Task<Image<Rgba32>> HandlePreview(Dictionary<int, Dictionary<string, string>> previewImages, int batchCount, string username, ulong messageId)
         {
-            Console.WriteLine($"Processing preview images for batch index {batchCount}");
             if (batchCount % batchProcessFrequency == 0)
             {
-                Image<Rgba32> gridImage = await ImageGrid.CreateGridAsync(previewImages);
-                Console.WriteLine("Preview images processed.");
+                Image<Rgba32> gridImage = await ImageGrid.CreateGridAsync(previewImages, username, messageId);
                 return gridImage;
             }
-            // Return null or an empty image if it's not the batch we want to process
-            Console.WriteLine("Preview images NOT processed.");
             return null;
         }
 
         /// <summary>Processes the final images, generating a grid image from the base64.</summary>
         /// <param name="finalImages">A dictionary where each key represents a batch index, another dictionary containing base64.</param>
         /// <returns>A grid image composed of the final images.</returns>
-        private async Task<Image<Rgba32>> HandleFinal(Dictionary<int, Dictionary<string, string>> finalImages)
+        private async Task<Image<Rgba32>> HandleFinal(Dictionary<int, Dictionary<string, string>> finalImages, string username, ulong messageId)
         {
-            Image<Rgba32> gridImage = await ImageGrid.CreateGridAsync(finalImages);
+            Image<Rgba32> gridImage = await ImageGrid.CreateGridAsync(finalImages, username, messageId);
             return gridImage;
         }
         
         private async Task HandleStatus(Dictionary<int, Dictionary<string, string>> status)
         {
             Console.WriteLine("Status received");
-        }
-
-        // TODO: Implement this to save image to Supabase Maybethis should be in Showcase.cs
-        public async Task SaveImage()
-        {
-            Console.WriteLine("Converting and saving image...");
         }
 
         /// <summary>Removes the Base64 prefix from a Base64 string if it exists.</summary>
