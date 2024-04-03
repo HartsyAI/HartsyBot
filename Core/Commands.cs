@@ -22,21 +22,6 @@ namespace HartsyBot.Core
             _supabaseClient = new SupabaseClient();
             _stableSwarmAPI = new StableSwarmAPI();
         }
-        // make a test command
-        [SlashCommand("test", "Test the bot")]
-        public async Task TestCommand()
-        {
-            var builder = new ComponentBuilder()
-                .WithSelectMenu(new SelectMenuBuilder()
-                    .WithCustomId("select_image")
-                    .WithPlaceholder("Choose an image")
-                    .AddOption("Image 1", "image_0")
-                    .AddOption("Image 2", "image_1")
-                    .AddOption("Image 3", "image_2")
-                    .AddOption("Image 4", "image_3"));
-            await RespondAsync("Test command executed successfully!", components: builder.Build());
-
-        }
 
         [SlashCommand("help", "Learn how to use the bot")]
         public async Task HelpCommand()
