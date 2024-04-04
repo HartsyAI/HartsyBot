@@ -64,7 +64,7 @@ namespace Hartsy.Core
                 Checkpoint = "StarlightXL.safetensors",
                 Seed = null,
                 OrderRank = 1,
-                ImageUrl = null,
+                ImageUrl = "https://github.com/kalebbroo/Hartsy/blob/main/images/placeholder.jpg",
                 CreatedAt = DateTime.UtcNow.ToString(),
                 Active = true,
                 UserId = null,
