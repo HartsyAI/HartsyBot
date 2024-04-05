@@ -1,6 +1,7 @@
 ﻿using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Processing;
 using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing.Processors.Filters;
 
 namespace Hartsy.Core
 {
@@ -53,6 +54,10 @@ namespace Hartsy.Core
                         await SaveImageAsync(image, username, messageId, index);
 
                     }
+                    if (!isPreview)
+                    {
+                        AddWatermark(gridImage, "../../../images/logo.gif");
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -73,6 +78,23 @@ namespace Hartsy.Core
 
                 var filePath = Path.Combine(directoryPath, $"image_{imageIndex}.jpeg");
                 await image.SaveAsJpegAsync(filePath);
+            }
+        }
+        private static void AddWatermark(Image<Rgba32> gridImage, string watermarkImagePath)
+        {
+            // Load the watermark image
+            using var watermarkImage = Image.Load<Rgba32>(watermarkImagePath);
+
+            // Apply semi-transparency to the watermark image
+            watermarkImage.Mutate(op => op.ApplyProcessor(new OpacityProcessor(0.08f)));
+
+            // Tile the watermark image across the grid
+            for (int y = 0; y < gridImage.Height; y += watermarkImage.Height)
+            {
+                for (int x = 0; x < gridImage.Width; x += watermarkImage.Width)
+                {
+                    gridImage.Mutate(ctx => ctx.DrawImage(watermarkImage, new Point(x, y), 1f));
+                }
             }
         }
 
