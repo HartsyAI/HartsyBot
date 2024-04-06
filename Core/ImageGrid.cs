@@ -76,7 +76,7 @@ namespace Hartsy.Core
                 var directoryPath = Path.Combine(Directory.GetCurrentDirectory(), $"../../../images/{username}/{messageId}/");
                 Directory.CreateDirectory(directoryPath);  // Ensure the directory exists
 
-                var filePath = Path.Combine(directoryPath, $"image_{imageIndex}.jpeg");
+                var filePath = Path.Combine(directoryPath, $"{messageId}:image_{imageIndex}.jpeg");
                 await image.SaveAsJpegAsync(filePath);
             }
         }

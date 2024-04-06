@@ -497,7 +497,7 @@ namespace HartsyBot.Core
                 var username = interaction.User.Username;
                 string userId = interaction.User.Id.ToString();
 
-                var filePath = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), $"../../../images/{username}/{messageId}/{selectedValue}.jpeg"));
+                var filePath = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), $"../../../images/{username}/{messageId}/{messageId}:{selectedValue}.jpeg"));
                 // add the base 64 of the image to send to generatefromtemplate
                 var initimage = Convert.ToBase64String(File.ReadAllBytes(filePath));
 
@@ -537,7 +537,18 @@ namespace HartsyBot.Core
                     }
                     else if (actionType == "add")
                     {
-                        await FollowupAsync("Image saved successfully!", ephemeral: true);
+                        var supaUser = await _supabaseClient.GetUserByDiscordId(userId);
+                        var supaUserId = supaUser.Id;
+                        var url = await _supabaseClient.UploadImage(supaUserId, filePath);
+                        if (url != null)
+                        {
+                            _supabaseClient.AddImage(supaUserId, url);
+                            await FollowupAsync($"Image saved successfully! URL: {url}", ephemeral: true);
+                        }
+                        else
+                        {
+                            await FollowupAsync("Error saving image.", ephemeral: true);
+                        }
                     }
                 }
                 else

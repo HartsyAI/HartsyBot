@@ -5,6 +5,8 @@ using static Postgrest.Constants;
 using System.Text.Json.Serialization;
 using System.Text.Json;
 using dotenv.net;
+using Microsoft.IdentityModel.Tokens;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 public class SupabaseClient
 {
@@ -184,7 +186,6 @@ public class SupabaseClient
             var userId = user.Id;
             var newGeneration = new Generations
             {
-                Id = 1000,
                 UserId = userId,
                 Batch = 1,
                 //Duration = 1000,
@@ -192,12 +193,12 @@ public class SupabaseClient
                 Negative = "Example of negative aspects",
                 Checkpoint = "StarlightXL.safetensors",
                 CreatedAt = DateTime.UtcNow,
-                ComfyEndpoint = url,
+                ComfyEndpointId = 1,
                 ComfyPromptId = "e639da24-6ce1-46df-93b0-c5f20fe79c3b",
                 Width = 1024,
                 Height = 768,
                 //TemplateId = 123,
-                Status = "queued"
+                Status = "saved"
             };
 
             var response = await supabase.From<Generations>().Insert(newGeneration);
@@ -216,6 +217,41 @@ public class SupabaseClient
             Console.WriteLine($"Error adding generation: {ex.Message}");
         }
     }
+
+    public async Task AddImage(string userId, string imageUrl)
+    {
+        try
+        {
+            if (userId == null)
+            {
+                Console.WriteLine("User not found.");
+            }
+            var newImage = new Images
+            {
+                UserId = Guid.Parse(userId),
+                GenerationId = 815,
+                ImageUrl = imageUrl,
+                CreatedAt = DateTime.UtcNow,
+                LikesCount = 0,
+                IsPublic = false
+            };
+
+            var response = await supabase.From<Images>().Insert(newImage);
+
+            if (response == null)
+            {
+                Console.WriteLine($"Error inserting new image: {response.ResponseMessage}");
+            }
+            else
+            {
+                Console.WriteLine("New image row added successfully.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error adding image: {ex.Message}");
+        }
+    }   
 
     public async Task AddTemplate(Template newTemplate)
     {
@@ -248,10 +284,8 @@ public class SupabaseClient
                                          .Set(x => x.Credit, newCredit)
                                          .Update();
             // Check the result of the operation
-            Console.WriteLine(response.ResponseMessage.IsSuccessStatusCode);
             if (response.ResponseMessage.IsSuccessStatusCode)
             {
-                Console.WriteLine("User credit updated successfully.");
                 return true;
             }
             else
@@ -266,6 +300,41 @@ public class SupabaseClient
             return false;
         }
     }
+
+    public async Task<string> UploadImage(string userId, string imagePath)
+    {
+        try
+        {
+            var storage = supabase.Storage;
+            string fileName = Path.GetFileName(imagePath);
+            string storagePath = $"{userId}/{fileName}";
+
+            byte[] fileContents;
+            using (var stream = File.OpenRead(imagePath))
+            {
+                using (var memoryStream = new MemoryStream())
+                {
+                    await stream.CopyToAsync(memoryStream);
+                    fileContents = memoryStream.ToArray();
+                }
+            }
+
+            var uploadResponse = await storage.From("generations")
+                .Upload(fileContents, storagePath);
+
+            var url = storage.From("generations")
+                .GetPublicUrl(storagePath);
+            Console.WriteLine($"Image uploaded successfully: {url}");
+            return storagePath;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error uploading image: {ex.Message}");
+            return null;
+        }
+    }
+
+
 
 
     [Table("users")]
@@ -538,8 +607,8 @@ public class SupabaseClient
         [Column("created_at")]
         public DateTime CreatedAt { get; set; }
 
-        [Column("comfy_endpoint")]
-        public string? ComfyEndpoint { get; set; }
+        [Column("comfy_endpoint_id")]
+        public int? ComfyEndpointId { get; set; }
 
         [Column("comfy_prompt_id")]
         public string? ComfyPromptId { get; set; }
