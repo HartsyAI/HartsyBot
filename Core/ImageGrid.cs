@@ -56,7 +56,7 @@ namespace Hartsy.Core
                     }
                     if (!isPreview)
                     {
-                        AddWatermark(gridImage, "../../../images/logo.gif");
+                        await AddWatermark(gridImage, "../../../images/logo.png");
                     }
                 }
                 catch (Exception ex)
@@ -80,23 +80,21 @@ namespace Hartsy.Core
                 await image.SaveAsJpegAsync(filePath);
             }
         }
-        private static void AddWatermark(Image<Rgba32> gridImage, string watermarkImagePath)
+        private static async Task AddWatermark(Image<Rgba32> gridImage, string watermarkImagePath)
         {
-            // Load the watermark image
-            using var watermarkImage = Image.Load<Rgba32>(watermarkImagePath);
+            using var originalWatermarkImage = await Image.LoadAsync<Rgba32>(watermarkImagePath);
 
-            // Apply semi-transparency to the watermark image
-            watermarkImage.Mutate(op => op.ApplyProcessor(new OpacityProcessor(0.08f)));
+            // Apply semi-transparency to the watermark image and create a clone for tiling
+            using var transparentWatermark = originalWatermarkImage.Clone(ctx => ctx.ApplyProcessor(new OpacityProcessor(0.03f)));
 
-            // Tile the watermark image across the grid
-            for (int y = 0; y < gridImage.Height; y += watermarkImage.Height)
+            // Tile the semi-transparent watermark image across the grid
+            for (int y = 0; y < gridImage.Height; y += transparentWatermark.Height)
             {
-                for (int x = 0; x < gridImage.Width; x += watermarkImage.Width)
+                for (int x = 0; x < gridImage.Width; x += transparentWatermark.Width)
                 {
-                    gridImage.Mutate(ctx => ctx.DrawImage(watermarkImage, new Point(x, y), 1f));
+                    gridImage.Mutate(ctx => ctx.DrawImage(transparentWatermark, new Point(x, y), 1f));
                 }
             }
         }
-
     }
 }

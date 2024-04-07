@@ -383,30 +383,10 @@ namespace HartsyBot.Core
             }
         }
 
-
-        [ComponentInteraction("yes:*")]
-        public async Task YesButtonHandler(string customId)
-        {
-            if (IsOnCooldown(Context.User, "yes"))
-            {
-                await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
-                return;
-            }
-        }
-
-        [ComponentInteraction("no:*")]
-        public async Task NoButtonHandler(string customId)
-        {
-            if (IsOnCooldown(Context.User, "no"))
-            {
-                await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
-                return;
-            }
-        }
-
         [ComponentInteraction("choose_image:*")]
-        public async Task LinkAccountButtonHandler(string customId)
+        public async Task ChooseImageButtonHandler(string customId)
         {
+            Console.WriteLine($"Custom ID: {customId}");
             if (IsOnCooldown(Context.User, "choose_image"))
             {
                 await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
@@ -443,6 +423,10 @@ namespace HartsyBot.Core
 
                 try
                 {
+                    string[] splitCustomId = customId.Split(":");
+                    ulong userId = ulong.Parse(splitCustomId[1]);
+                    string type = splitCustomId[0].ToString();
+                    Console.WriteLine($"User ID: {userId}, Type: {type}");
                     var interaction = Context.Interaction as SocketMessageComponent;
                     string username = interaction.User.Username;
                     ulong messageId = interaction.Message.Id;
@@ -453,16 +437,16 @@ namespace HartsyBot.Core
                             .AddOption("Image 3", "image_2")
                             .AddOption("Image 4", "image_3");
 
-                    if (customId == "i2i")
+                    if (type == "i2i")
                     {
-                        selectMenu.WithCustomId($"select_image:i2i={messageId}");
+                        selectMenu.WithCustomId($"select_image:i2i:{userId}:{messageId}");
                         var selectBuilder = new ComponentBuilder()
                             .WithSelectMenu(selectMenu);
                         await RespondAsync("You have selected the 'Image to Image' option.", components: selectBuilder.Build(), ephemeral: true);
                         Console.WriteLine($"User {username} Message ID: {messageId}");
                         return;
                     }
-                    else if (customId == "save")
+                    else if (type == "save")
                     {
                         selectMenu.WithCustomId($"select_image:add={messageId}");
                         var selectBuilder = new ComponentBuilder()
@@ -487,15 +471,23 @@ namespace HartsyBot.Core
 
             if (!string.IsNullOrEmpty(selectedValue))
             {
-                var parts = customId.Split('=');
-                if (parts.Length < 2) return;
+                string[] parts = customId.Split(':');
+                if (parts.Length >= 4) return;
 
                 var actionType = parts[0]; // Should give "i2i" or "add"
-                var messageId = parts[1]; // Should give the messageId part
+                var userid = parts[1]; // Should give the userId part
+                var messageId = parts[2]; // Should give the messageId part
+                Console.WriteLine($"Action Type: {actionType}, User ID: {userid}, Message ID: {messageId}");
 
                 var interaction = Context.Interaction as SocketMessageComponent;
                 var username = interaction.User.Username;
                 string userId = interaction.User.Id.ToString();
+
+                if (userId != userid)
+                {
+                    await FollowupAsync("Error: You cannot select another user's image.", ephemeral: true);
+                    return;
+                }
 
                 var filePath = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), $"../../../images/{username}/{messageId}/{messageId}:{selectedValue}.jpeg"));
                 // add the base 64 of the image to send to generatefromtemplate
@@ -537,6 +529,7 @@ namespace HartsyBot.Core
                     }
                     else if (actionType == "add")
                     {
+                        // TODO: Check if the user has room in the gallery to add the image
                         var supaUser = await _supabaseClient.GetUserByDiscordId(userId);
                         var supaUserId = supaUser.Id;
                         var url = await _supabaseClient.UploadImage(supaUserId, filePath);

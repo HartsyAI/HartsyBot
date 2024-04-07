@@ -321,13 +321,15 @@ namespace HartsyBot.Core
             string deleteCustomId = $"delete:{userId}";
             string showcaseCustomId = $"showcase:{userId}";
             string reportCustomId = $"report:{userId}";
+            string i2iCustomId = $"choose_image:i2i:{userId}";
+            string saveCustomId = $"choose_image:save:{userId}";
             return new ComponentBuilder()
                 .WithButton("Regenerate", customId, ButtonStyle.Success)
                 .WithButton("Add to Showcase", showcaseCustomId, ButtonStyle.Primary)
                 .WithButton("Report", reportCustomId, ButtonStyle.Secondary, emote: new Emoji("\u26A0")) // ⚠
                 .WithButton(" ", deleteCustomId, ButtonStyle.Danger, emote: new Emoji("\uD83D\uDDD1")) // 🗑
-                .WithButton("Image2Image", "choose_image:i2i", ButtonStyle.Secondary, row: 1)
-                .WithButton("Save To Gallery", "choose_image:save", ButtonStyle.Secondary, row: 1);
+                .WithButton("Image2Image", i2iCustomId, ButtonStyle.Secondary, row: 1)
+                .WithButton("Save To Gallery", saveCustomId, ButtonStyle.Secondary, row: 1);
         }
     }
 }
