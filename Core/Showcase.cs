@@ -1,5 +1,6 @@
 ﻿using Discord;
 using Discord.WebSocket;
+using System.Net.Mail;
 
 namespace Hartsy.Core
 {
@@ -13,12 +14,12 @@ namespace Hartsy.Core
         }
 
         /// <summary>Showcases an image in the showcase channel. This method is used to display
-        /// images in the showcase channel. It creates a new message in the showcase</summary>
+        /// images in the showcase channel. It creates a new message in the showcase channel with the image attached.</summary>
         /// <param name="guild">The guild where the showcase channel is located.</param>
-        /// <param name="imageUrl">The URL of the image to showcase.</param>
+        /// <param name="imagePath">The path to the image file to showcase.</param>
         /// <param name="user">The user who submitted the image.</param>
-        /// >returns>A Task that represents the asynchronous operation of showcasing an image.</returns>
-        public async Task ShowcaseImageAsync(IGuild guild, string imageUrl, IUser user)
+        /// <returns>A Task that represents the asynchronous operation of showcasing an image.</returns>
+        public async Task ShowcaseImageAsync(IGuild guild, string imagePath, IUser user)
         {
             var channels = await guild.GetChannelsAsync();
             var showcaseChannel = channels.FirstOrDefault(x => x.Name == "showcase") as ITextChannel;
@@ -33,18 +34,21 @@ namespace Hartsy.Core
                 .WithButton("Report", customId: "report:admin", style: ButtonStyle.Secondary, emote: new Emoji("\u26A0")) // ⚠
                 .WithButton(" ", customId: $"delete:{user.Id}", style: ButtonStyle.Danger, emote: new Emoji("\uD83D\uDDD1")) // 🗑
                 .Build();
-
+            // Load the image file as an attachment
+            using var fileStream = new FileStream(imagePath, FileMode.Open);
+            var filename = Path.GetFileName(imagePath);
+            Console.WriteLine($"Showcasing image: {filename}");
             var embed = new EmbedBuilder()
                 .WithTitle("Showcase Image")
                 .WithDescription($"Submitted by {user.Username}")
-                .WithImageUrl(imageUrl)
                 .WithThumbnailUrl(user.GetAvatarUrl() ?? user.GetDefaultAvatarUrl())
+                .WithImageUrl($"attachment://{filename}")
                 .AddField("Upvotes", "None", true)
                 .WithFooter("Total Votes: 0")
                 .Build();
 
-            var message = await showcaseChannel.SendMessageAsync(embed: embed);
-            await message.ModifyAsync(msg => msg.Components = components);
+            var fileAttachment = new FileAttachment(fileStream, filename);
+            var message = await showcaseChannel.SendFileAsync(attachment: fileAttachment, text: null, embed: embed, components: components);
             await showcaseChannel.CreateThreadAsync($"Discuss Showcase by {user.Username}", autoArchiveDuration: ThreadArchiveDuration.OneDay, message: message);
         }
 

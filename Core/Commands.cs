@@ -260,11 +260,11 @@ namespace HartsyBot.Core
                     {"donotsave", true},
                     {"model", "starlightXLAnimated_v3.safetensors"},
                     {"loras", "an0tha0ne.safetensors"},
-                    {"loraweights", 1},
+                    {"loraweights", 1.25},
                     {"width", 1024},
                     {"height", 768},
                     {"cfgscale", 6.5},
-                    {"steps", 32},
+                    {"steps", 28},
                     {"seed", -1},
                     {"sampler", "dpmpp_3m_sde"},
                     {"scheduler", "karras"},
@@ -291,8 +291,8 @@ namespace HartsyBot.Core
                 if (isFinal)
                 {
                     updatedEmbed.WithDescription($"Generated an image for **{username}**\n\n**Text:** {text}\n\n**Extra Description:** {description}" +
-                        $"\n\n**Template Used:** {template}\n\n`{TemplateInfo}`");
-                    updatedEmbed.WithFooter("Visit Hartsy.AI to generate more!");
+                        $"\n\n**Template Used:** {template}\n\n`{TemplateInfo}`\n\n**Click Save to Gallery button to see the fullsize image**");
+                    updatedEmbed.WithFooter("Click Save to Gallery button to see the fullsize image");
                     updatedEmbed.WithColor(Discord.Color.Green);
 
                     await previewMsg.ModifyAsync(m =>

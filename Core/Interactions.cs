@@ -242,60 +242,40 @@ namespace HartsyBot.Core
             if (Context.User.Id.ToString() != customId)
             {
                 Console.WriteLine("Another user tried to click a button");
-                await RespondAsync("Error: You cannot Showcase another user's image.", ephemeral: true);
+                await RespondAsync("Error: You cannot showcase another user's image.", ephemeral: true);
                 return;
             }
-
-            Console.WriteLine("Handling showcase interaction.");
             await DeferAsync(); // Defer the response
-
-            var client = Context.Client as DiscordSocketClient;
-            if (client == null)
-            {
-                Console.WriteLine("Discord client not available.");
-                await FollowupAsync("Error: Discord client not available.", ephemeral: true);
-                return;
-            }
             var originalMessage = (Context.Interaction as SocketMessageComponent)?.Message as IUserMessage;
 
-            if (originalMessage == null)
-            {
-                Console.WriteLine("Original message not found.");
-                await FollowupAsync("Original message not found.", ephemeral: true);
-                return;
-            }
+            // Create a select menu for the user to choose an image to showcase
+            var selectMenu = new SelectMenuBuilder()
+                .WithCustomId($"select_image:showcase:{Context.User.Id}:{originalMessage.Id}")
+                .WithPlaceholder("Select an image to add to the showcase channel")
+                .AddOption("Image 1", "image_0")
+                .AddOption("Image 2", "image_1")
+                .AddOption("Image 3", "image_2")
+                .AddOption("Image 4", "image_3");
 
-            var embed = originalMessage.Embeds.FirstOrDefault();
-            if (embed == null || string.IsNullOrEmpty(embed.Image?.Url))
-            {
-                Console.WriteLine("No image found in the original message.");
-                await FollowupAsync("No image found in the original message.", ephemeral: true);
-                return;
-            }
+            var selectBuilder = new ComponentBuilder()
+                .WithSelectMenu(selectMenu);
 
-            // Disable the "Showcase" button
-            var componentBuilder = new ComponentBuilder();
-            foreach (var actionRow in originalMessage.Components)
-            {
-                if (actionRow is ActionRowComponent actionRowComponent)
-                {
-                    foreach (var innerComponent in actionRowComponent.Components)
-                    {
-                        if (innerComponent is ButtonComponent buttonComponent)
-                        {
-                            bool isDisabled = buttonComponent.CustomId == $"showcase:{customId}";
-                            componentBuilder.WithButton(buttonComponent.Label, buttonComponent.CustomId, buttonComponent.Style, buttonComponent.Emote, url: null, isDisabled);
-                        }
-                    }
-                }
-            }
+            var showcaseEmbed = new EmbedBuilder()
+                .WithTitle("Select Image for Showcase")
+                .WithDescription("Select an image to add to the #showcase channel. Other users will be able to vote on your image.")
+                .WithColor(Color.Blue)
+                .WithCurrentTimestamp();
+
+            await FollowupAsync(embed: showcaseEmbed.Build(), components: selectBuilder.Build(), ephemeral: true);
+
+            // TODO: Fix it so showcase button is disabled after image is showcased
 
             // Update the original message with the modified components
-            await originalMessage.ModifyAsync(msg => msg.Components = componentBuilder.Build());
+            //await originalMessage.ModifyAsync(msg => msg.Components = componentBuilder.Build());
 
-            Console.WriteLine("Calling ShowcaseImageAsync.");
-            await _showcase.ShowcaseImageAsync(Context.Guild, embed.Image.Value.Url, Context.User);
-            await FollowupAsync("Image added to the showcase!", ephemeral: true);
+            //Console.WriteLine("Calling ShowcaseImageAsync.");
+            //await _showcase.ShowcaseImageAsync(Context.Guild, embed.Image.Value.Url, Context.User);
+            //await FollowupAsync("Image added to the showcase!", ephemeral: true);
         }
 
         [ComponentInteraction("vote:*")]
@@ -565,6 +545,11 @@ namespace HartsyBot.Core
                         {
                             await FollowupAsync("Error saving image.", ephemeral: true);
                         }
+                    }
+                    else if (actionType == "showcase")
+                    {
+                        await _showcase.ShowcaseImageAsync(Context.Guild, filePath, Context.User);
+                        await FollowupAsync("Image added to the showcase!", ephemeral: true);
                     }
                 }
                 else
