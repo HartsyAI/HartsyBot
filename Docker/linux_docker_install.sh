@@ -31,8 +31,8 @@ else
     echo "Docker is already installed."
 fi
 
-# Navigate to the project directory
-cd "$(dirname "$0")"
+# Navigate to the root directory of the project where Dockerfile is located
+cd "$(dirname "$0")"/..
 
 # Build the Docker image
 echo "Building Docker image for HartsyBot..."
