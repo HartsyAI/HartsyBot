@@ -260,7 +260,7 @@ namespace HartsyBot.Core
                     {"donotsave", true},
                     {"model", "starlightXLAnimated_v3.safetensors"},
                     {"loras", "an0tha0ne.safetensors"},
-                    {"loraweights", 1.25},
+                    {"loraweights", 0.9},
                     {"width", 1024},
                     {"height", 768},
                     {"cfgscale", 6.5},
