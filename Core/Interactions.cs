@@ -426,7 +426,6 @@ namespace HartsyBot.Core
                     string[] splitCustomId = customId.Split(":");
                     ulong userId = ulong.Parse(splitCustomId[1]);
                     string type = splitCustomId[0].ToString();
-                    Console.WriteLine($"User ID: {userId}, Type: {type}");
                     var interaction = Context.Interaction as SocketMessageComponent;
                     string username = interaction.User.Username;
                     ulong messageId = interaction.Message.Id;
@@ -442,8 +441,14 @@ namespace HartsyBot.Core
                         selectMenu.WithCustomId($"select_image:i2i:{userId}:{messageId}");
                         var selectBuilder = new ComponentBuilder()
                             .WithSelectMenu(selectMenu);
-                        await RespondAsync("You have selected the 'Image to Image' option.", components: selectBuilder.Build(), ephemeral: true);
-                        Console.WriteLine($"User {username} Message ID: {messageId}");
+                        var itiEmbed = new EmbedBuilder()
+                            .WithTitle("Select Image")
+                            .WithDescription("Choose an image and we will generate 4 new images based off of that.")
+                            .WithColor(Color.Purple)
+                            .WithCurrentTimestamp();
+
+                        await RespondAsync(embed: itiEmbed.Build(), components: selectBuilder.Build(), ephemeral: true);
+
                         return;
                     }
                     else if (type == "save")
@@ -451,7 +456,14 @@ namespace HartsyBot.Core
                         selectMenu.WithCustomId($"select_image:add:{userId}:{messageId}");
                         var selectBuilder = new ComponentBuilder()
                             .WithSelectMenu(selectMenu);
-                        await RespondAsync("You have selected the 'Save' option.", components: selectBuilder.Build(), ephemeral: true);
+                        var saveEmbed = new EmbedBuilder()
+                            .WithTitle("Select Image")
+                            .WithDescription("Select the image you wish to save to the gallery")
+                            .WithColor(Color.Blue)
+                            .WithCurrentTimestamp();
+
+                        await RespondAsync(embed: saveEmbed.Build(), components: selectBuilder.Build(), ephemeral: true);
+
                         return;
                     }
                 }
@@ -467,7 +479,6 @@ namespace HartsyBot.Core
         {
             await DeferAsync();
             var selectedValue = selections.FirstOrDefault();
-            Console.WriteLine($"Selected value: {selectedValue}");
 
             if (!string.IsNullOrEmpty(selectedValue))
             {
@@ -477,7 +488,6 @@ namespace HartsyBot.Core
                 var actionType = parts[0]; // Should give "i2i" or "add"
                 var userid = parts[1]; // Should give the userId part
                 var messageId = parts[2]; // Should give the messageId part
-                Console.WriteLine($"Action Type: {actionType}, User ID: {userid}, Message ID: {messageId}");
 
                 var interaction = Context.Interaction as SocketMessageComponent;
                 var username = interaction.User.Username;
@@ -485,7 +495,13 @@ namespace HartsyBot.Core
 
                 if (userId != userid)
                 {
-                    await FollowupAsync("Error: You cannot select another user's image.", ephemeral: true);
+                    var errorEmbed = new EmbedBuilder()
+                        .WithTitle("Selection Error")
+                        .WithDescription("Error: You cannot select another user's image.")
+                        .WithColor(Color.Red)
+                        .WithCurrentTimestamp();
+
+                    await FollowupAsync(embed: errorEmbed.Build(), ephemeral: true);
                     return;
                 }
 
@@ -536,7 +552,14 @@ namespace HartsyBot.Core
                         if (url != null)
                         {
                             _supabaseClient.AddImage(supaUserId, url);
-                            await FollowupAsync($"Image saved successfully! URL: {url}", ephemeral: true);
+                            // Create an embed builder instance
+                            var embed = new EmbedBuilder()
+                                .WithTitle("Image Saved Successfully")
+                                .WithDescription("Your image has been added to your gallery. You can go to [Hartsy.ai](https://hartsy.ai) to view and download.")
+                                .WithColor(Color.Green)
+                                .WithCurrentTimestamp();
+
+                            await FollowupAsync(embed: embed.Build(), ephemeral: true);
                         }
                         else
                         {
