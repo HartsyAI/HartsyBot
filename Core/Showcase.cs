@@ -37,7 +37,9 @@ namespace Hartsy.Core
             // Load the image file as an attachment
             using var fileStream = new FileStream(imagePath, FileMode.Open);
             var filename = Path.GetFileName(imagePath);
-            Console.WriteLine($"Showcasing image: {filename}");
+            filename = filename.Replace(":", "_");
+            Console.WriteLine($"Uploading image: {filename}");
+
             var embed = new EmbedBuilder()
                 .WithTitle("Showcase Image")
                 .WithDescription($"Submitted by {user.Username}")
