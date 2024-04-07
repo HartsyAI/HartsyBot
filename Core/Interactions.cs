@@ -448,7 +448,7 @@ namespace HartsyBot.Core
                     }
                     else if (type == "save")
                     {
-                        selectMenu.WithCustomId($"select_image:add={messageId}");
+                        selectMenu.WithCustomId($"select_image:add:{userId}:{messageId}");
                         var selectBuilder = new ComponentBuilder()
                             .WithSelectMenu(selectMenu);
                         await RespondAsync("You have selected the 'Save' option.", components: selectBuilder.Build(), ephemeral: true);
