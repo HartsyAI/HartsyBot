@@ -15,7 +15,6 @@ install_dotnet() {
 }
 
 echo "Checking for .NET SDK 8..."
-# Check for .NET 8
 if ! command_exists dotnet || [ -z "$(dotnet --list-sdks | grep '8.')" ]; then
     install_dotnet
 else
@@ -23,7 +22,6 @@ else
 fi
 
 echo "Checking for Docker..."
-# Check if Docker is installed
 if ! command_exists docker; then
     echo "Error: Docker is not installed. Please install Docker and rerun this script."
     exit 1
@@ -31,17 +29,18 @@ else
     echo "Docker is already installed."
 fi
 
-# Navigate to the root directory of the project where Dockerfile is located
-cd "$(dirname "$0")"/..
+# Ensure the script is in the Hartsy directory where the Hartsy.csproj file is located
+cd "$(dirname "$0")/.."
 
-# Build the Docker image
+echo "Current directory:"
+pwd
+
 echo "Building Docker image for HartsyBot..."
-docker build -t hartsybot .
+# Specify the Dockerfile path relative to the context directory
+docker build -f Docker/Dockerfile -t hartsybot .
 
-# Run the Docker container with the .env file
 echo "Running HartsyBot in Docker..."
 docker run -d --name hartsybot-instance --env-file ./.env hartsybot
 
-# Keep the window open
 echo "Press Enter to close this window..."
 read
