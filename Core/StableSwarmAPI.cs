@@ -11,7 +11,6 @@ namespace Hartsy.Core
     {
         private static readonly HttpClient Client = new HttpClient();
         private readonly string _swarmURL;
-        private static string Session = "";
         private static int batchCount = 0;
         private const int batchProcessFrequency = 2;
 
@@ -20,13 +19,14 @@ namespace Hartsy.Core
             _swarmURL = Environment.GetEnvironmentVariable("SWARM_URL");
         }
 
-        public async Task GetSession()
+        public async Task<string> GetSession()
         {
             try
             {
                 JObject sessData = await PostJson($"{_swarmURL}/API/GetNewSession", new JObject());
-                Session = sessData["session_id"].ToString();
-                Console.WriteLine($"Session acquired successfully: {Session}");
+                string sessionId = sessData["session_id"].ToString();
+                Console.WriteLine($"Session acquired successfully: {sessionId}");
+                return sessionId;
             }
             catch (Exception ex)
             {
@@ -34,6 +34,7 @@ namespace Hartsy.Core
                 throw;
             }
         }
+
 
         private async Task EnsureWebSocketConnectionAsync(ClientWebSocket webSocket)
         {
@@ -66,8 +67,7 @@ namespace Hartsy.Core
 
         private async Task<Dictionary<string, object>> CreateRequestObject(Dictionary<string, object> payload)
         {
-            await GetSession();
-            payload["session_id"] = Session;
+            payload["session_id"] = await GetSession();
 
             // Remove all entries where the value is null
             var keysToRemove = payload.Where(kvp => kvp.Value == null).Select(kvp => kvp.Key).ToList();
@@ -101,8 +101,8 @@ namespace Hartsy.Core
                 if (result.MessageType == WebSocketMessageType.Close)
                     break;
                 string jsonString = stringBuilder.ToString();
-                //string logString = ReplaceBase64(jsonString);
-                //Console.WriteLine("Response JSON (excluding base64 data): " + logString);
+                string logString = ReplaceBase64(jsonString);
+                Console.WriteLine("Response JSON (excluding base64 data): " + logString);
                 var responseData = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonString);
 
                 foreach (var kvp in responseData)
