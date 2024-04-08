@@ -88,10 +88,14 @@ namespace Hartsy.Core
             builder.Fields[0].WithIsInline(true).WithValue(string.Join(", ", upvotes));
             builder.WithFooter($"Total Votes: {upvotes.Count(upvote => upvote != "None")}");
 
-            await message.ModifyAsync(msg => msg.Embed = builder.Build());
+            await message.ModifyAsync(msg =>
+            {
+                msg.Embed = builder.Build();
+                msg.Attachments = null;
+            });
 
             // If upvotes reach 5, send to "top-hartists" channel
-            if (upvotes.Count(upvote => upvote != "None") >= 5)
+            if (upvotes.Count(upvote => upvote != "None") == 5)
             {
                 var channelGuild = message.Channel as SocketGuildChannel;
                 var guild = channelGuild.Guild;
