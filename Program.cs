@@ -19,8 +19,11 @@ namespace HartsyBot
 
         public object? Context { get; private set; }
 
+        /// <summary>Main entry point for the bot application.</summary>
         static void Main(string[] args) => new Program().MainAsync().GetAwaiter().GetResult();
 
+        /// <summary>Starts the main execution of the bot program asynchronously. Initializes the client, services, and event handlers.</summary>
+        /// <returns>A Task representing the asynchronous operation.</returns>
         public async Task MainAsync()
         {
             // Try to get the bot token from environment variables
@@ -72,6 +75,8 @@ namespace HartsyBot
             await Task.Delay(-1);
         }
 
+        /// <summary>Configures and provides the services used by the bot, including Discord client, interaction service, and command handling.</summary>
+        /// <returns>A ServiceProvider containing the configured services.</returns>
         private ServiceProvider ConfigureServices()
         {
             return new ServiceCollection()
@@ -90,6 +95,9 @@ namespace HartsyBot
                 .BuildServiceProvider();
         }
 
+        /// <summary>Executes tasks when the bot client is ready, such as command registration and initialization. It registers commands to guilds and sets the bot status.</summary>
+        /// <param name="services">The service provider containing registered services.</param>
+        /// <returns>A Task representing the asynchronous operation.</returns>
         private async Task ReadyAsync(IServiceProvider services)
         {
             try
@@ -124,6 +132,9 @@ namespace HartsyBot
             }
         }
 
+        /// <summary>Handles logging of messages and exceptions from the Discord client and interaction services.</summary>
+        /// <param name="message">The message to log.</param>
+        /// <returns>A Task representing the asynchronous operation.</returns>
         private Task Log(LogMessage message)
         {
             Console.WriteLine($"{DateTime.Now} [{message.Severity}] {message.Source}: {message.Message}");

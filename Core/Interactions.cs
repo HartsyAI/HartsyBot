@@ -30,6 +30,10 @@ namespace HartsyBot.Core
         private static readonly Dictionary<(ulong, string), DateTime> _lastInteracted = [];
         private static readonly TimeSpan Cooldown = TimeSpan.FromSeconds(3); // 3 seconds cooldown
 
+        /// <summary>Checks if a user is on cooldown for a specific command.</summary>
+        /// <param name="user">The user to check for cooldown.</param>
+        /// <param name="command">The command to check for cooldown.</param>
+        /// <returns>True if the user is on cooldown; otherwise, false.</returns>
         private static bool IsOnCooldown(SocketUser user, string command)
         {
             var key = (user.Id, command);
@@ -44,6 +48,8 @@ namespace HartsyBot.Core
             return false;
         }
 
+        /// <summary>Handles the interaction when the 'read_rules' button is clicked, assigning or removing roles as necessary.</summary>
+        /// <returns>A task representing the asynchronous operation.</returns>
         [ComponentInteraction("read_rules")]
         public async Task ReadRulesButtonHandler()
         {
@@ -101,7 +107,8 @@ namespace HartsyBot.Core
             // TODO: Add a check if the user has linked their discord account with their Hartsy.AI account and if they are a subscriber
         }
 
-
+        /// <summary>Handles the interaction when the 'notify_me' button is clicked, toggling the 'Announcement' role for the user.</summary>
+        /// <returns>A task representing the asynchronous operation.</returns>
         [ComponentInteraction("notify_me")]
         public async Task NotifyMeButtonHandler()
         {
@@ -124,6 +131,9 @@ namespace HartsyBot.Core
             }
         }
 
+        /// <summary>Handles the interaction when the 'regenerate' button is clicked, regenerating the image based on the original parameters.</summary>
+        /// <param name="customId">The custom ID associated with the button that triggered the interaction.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
         [ComponentInteraction("regenerate:*")]
         public async Task RegenerateButtonHandler(string customId)
         {
@@ -186,6 +196,9 @@ namespace HartsyBot.Core
             await _commands.GenerateFromTemplate(text, template, channel, user, description);
         }
 
+        /// <summary>Parses the embed to extract text, description, and template information.</summary>
+        /// <param name="embed">The embed to parse.</param>
+        /// <returns>A tuple containing the text, description, and template extracted from the embed.</returns>
         private (string text, string description, string template) ParseEmbed(IEmbed embed)
         {
             string embedDescription = embed.Description ?? "";
@@ -206,6 +219,9 @@ namespace HartsyBot.Core
             return (text, description, template);
         }
 
+        /// <summary>Handles the interaction when the 'delete' button is clicked, removing the associated message.</summary>
+        /// <param name="customId">The custom ID associated with the button that triggered the interaction.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
         [ComponentInteraction("delete:*")]
         public async Task DeleteButtonHandler(string customId)
         {
@@ -230,6 +246,9 @@ namespace HartsyBot.Core
             await FollowupAsync("Message deleted successfully", ephemeral: true);
         }
 
+        /// <summary>Handles the interaction when the 'showcase' button is clicked, preparing a selection menu for showcasing an image.</summary>
+        /// <param name="customId">The custom ID associated with the button that triggered the interaction.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
         [ComponentInteraction("showcase:*")]
         public async Task ShowcaseButtonHandler(string customId)
         {
@@ -278,6 +297,9 @@ namespace HartsyBot.Core
             //await FollowupAsync("Image added to the showcase!", ephemeral: true);
         }
 
+        /// <summary>Handles the interaction when a vote button is clicked, updating the vote count for an image.</summary>
+        /// <param name="customId">The custom ID associated with the button that triggered the interaction.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
         [ComponentInteraction("vote:*")]
         public async Task VoteButtonHandler(string customId)
         {
@@ -305,6 +327,9 @@ namespace HartsyBot.Core
             }
         }
 
+        /// <summary>Handles the interaction when the 'report' button is clicked, notifying staff of a reported image.</summary>
+        /// <param name="userId">The user ID associated with the button that triggered the interaction.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
         [ComponentInteraction("report:*")]
         public async Task ReportButtonHandler(string userId)
         {
@@ -363,6 +388,9 @@ namespace HartsyBot.Core
             }
         }
 
+        /// <summary>Handles the interaction when a user selects an image, providing options based on the action type.</summary>
+        /// <param name="customId">The custom ID associated with the select menu that triggered the interaction.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
         [ComponentInteraction("choose_image:*")]
         public async Task ChooseImageButtonHandler(string customId)
         {
@@ -454,6 +482,10 @@ namespace HartsyBot.Core
             }
         }
 
+        /// <summary>Handles the interaction when an image is selected for a specific action, such as showcasing or saving to gallery.</summary>
+        /// <param name="customId">The custom ID associated with the select menu that triggered the interaction.</param>
+        /// <param name="selections">The selections made by the user in the select menu.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
         [ComponentInteraction("select_image:*")]
         private async Task HandleImageSelect(string customId, string[] selections)
         {

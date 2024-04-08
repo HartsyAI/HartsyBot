@@ -17,6 +17,8 @@ public class SupabaseClient
         InitializeSupabase().GetAwaiter().GetResult();
     }
 
+    /// <summary>Initializes the Supabase client with the provided URL and key.</summary>
+    /// <returns>A task representing the asynchronous operation of initializing the Supabase client.</returns>
     private async Task InitializeSupabase()
     {
         var url = Environment.GetEnvironmentVariable("SUPABASE_URL");
@@ -42,6 +44,9 @@ public class SupabaseClient
         await supabase.InitializeAsync();
     }
 
+    /// <summary>Checks if a Discord ID is linked to a user in the database.</summary>
+    /// <param name="discordId">The Discord ID to check.</param>
+    /// <returns>A task that represents the asynchronous operation. The task result contains a boolean indicating if the Discord ID is linked.</returns>
     public async Task<bool> IsDiscordLinked(string discordId)
     {
         try
@@ -65,6 +70,9 @@ public class SupabaseClient
         }
     }
 
+    /// <summary>Retrieves a user from the database by their Discord ID.</summary>
+    /// <param name="discordId">The Discord ID of the user to retrieve.</param>
+    /// <returns>A task that represents the asynchronous operation. The task result contains the user object or null if not found.</returns>
     public async Task<Users?> GetUserByDiscordId(string discordId)
     {
         try
@@ -90,7 +98,9 @@ public class SupabaseClient
         }
     }
 
-
+    /// <summary>Gets the subscription status of a user by their Discord ID.</summary>
+    /// <param name="discordId">The Discord ID of the user to retrieve the subscription status for.</param>
+    /// <returns>A task that represents the asynchronous operation. The task result contains a dictionary with subscription status information or null if not found.</returns>
     public async Task<Dictionary<string, object>?> GetSubStatus(string discordId)
     {
         try
@@ -118,6 +128,9 @@ public class SupabaseClient
         }
     }
 
+    /// <summary>Retrieves subscription information for a user by their ID.</summary>
+    /// <param name="userId">The ID of the user to retrieve subscription information for.</param>
+    /// <returns>A task that represents the asynchronous operation. The task result contains the subscription object or null if not found.</returns>
     public async Task<Users?> GetSubscriptionByUserId(string userId)
     {
         try
@@ -147,6 +160,8 @@ public class SupabaseClient
         }
     }
 
+    /// <summary>Retrieves all templates from the database.</summary>
+    /// <returns>A task that represents the asynchronous operation. The task result contains a dictionary of templates keyed by their names, or null if no templates are found.</returns>
     public async Task<Dictionary<string, Template>?> GetTemplatesAsync()
     {
         try
@@ -173,6 +188,9 @@ public class SupabaseClient
         }
     }
 
+    /// <summary>Adds a new generation record for a user in the database.</summary>
+    /// <param name="discordId">The Discord ID of the user for whom the generation is being added.</param>
+    /// <returns>A task representing the asynchronous operation of adding the generation record.</returns>
     public async Task AddGenerationAsync(string discordId)
     {
         try
@@ -218,6 +236,10 @@ public class SupabaseClient
         }
     }
 
+    /// <summary>Adds a new image record for a user in the database.</summary>
+    /// <param name="userId">The ID of the user for whom the image is being added.</param>
+    /// <param name="imageUrl">The URL of the image being added.</param>
+    /// <returns>A task representing the asynchronous operation of adding the image record.</returns>
     public async Task AddImage(string userId, string imageUrl)
     {
         try
@@ -251,8 +273,11 @@ public class SupabaseClient
         {
             Console.WriteLine($"Error adding image: {ex.Message}");
         }
-    }   
+    }
 
+    /// <summary>Adds a new template to the database.</summary>
+    /// <param name="newTemplate">The template object to add to the database.</param>
+    /// <returns>A task representing the asynchronous operation of adding the template.</returns>
     public async Task AddTemplate(Template newTemplate)
     {
         try
@@ -275,6 +300,10 @@ public class SupabaseClient
         }
     }
 
+    /// <summary>Updates the credit count for a user in the database.</summary>
+    /// <param name="userId">The ID of the user whose credits are being updated.</param>
+    /// <param name="newCredit">The new credit amount to set.</param>
+    /// <returns>A task that represents the asynchronous operation. The task result contains a boolean indicating whether the update was successful.</returns>
     public async Task<bool> UpdateUserCredit(string userId, int newCredit)
     {
         try
@@ -301,6 +330,10 @@ public class SupabaseClient
         }
     }
 
+    /// <summary>Uploads an image to Supabase storage and returns its path.</summary>
+    /// <param name="userId">The ID of the user uploading the image.</param>
+    /// <param name="imagePath">The local file path of the image to upload.</param>
+    /// <returns>A task representing the asynchronous operation. The task result contains the path of the uploaded image in storage or null if the upload failed.</returns>
     public async Task<string> UploadImage(string userId, string imagePath)
     {
         try
@@ -334,9 +367,7 @@ public class SupabaseClient
         }
     }
 
-
-
-
+    /// <summary>Represents a user in the application, mapping to the 'users' table in Supabase.</summary>
     [Table("users")]
     public class Users : BaseModel
     {
@@ -388,9 +419,9 @@ public class SupabaseClient
         [Column("plan_name")]
         public string? PlanName { get; set; }
 
-
     }
 
+    /// <summary>Represents a subscription record, mapping to the 'subscriptions' table in Supabase.</summary>
     [Table("subscriptions")]
     public class Subscriptions : BaseModel
     {
@@ -462,7 +493,7 @@ public class SupabaseClient
         public int? Amount { get; set; }
     }
 
-
+    /// <summary>Represents a template record, mapping to the 'templates' table in Supabase.</summary>
     [Table("templates")]
     public class Template : BaseModel
     {
@@ -506,6 +537,7 @@ public class SupabaseClient
         public string? UserId { get; set; }
     }
 
+    /// <summary>Represents a price record, mapping to the 'prices' table in Supabase.</summary>
     [Table("prices")]
     public class Prices : BaseModel
     {
@@ -552,6 +584,7 @@ public class SupabaseClient
         public bool IsTopup { get; set; }
     }
 
+    /// <summary>Represents an image record, mapping to the 'images' table in Supabase.</summary>
     [Table("images")]
     public class Images : BaseModel
     {
@@ -580,6 +613,7 @@ public class SupabaseClient
         public bool IsPublic { get; set; }
     }
 
+    /// <summary>Represents a generation record, mapping to the 'generations' table in Supabase.</summary>
     [Table("generations")]
     public class Generations : BaseModel
     {

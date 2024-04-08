@@ -7,12 +7,17 @@ using System;
 
 namespace HartsyBot.Core
 {
+    /// <summary>Handles Discord events and interactions for the bot, including user joins and role assignments based on subscription status.</summary>
     public class EventHandlers
     {
         private readonly DiscordSocketClient _client;
         private readonly InteractionService _interactions;
         private readonly SupabaseClient _supabaseClient;
 
+        /// <summary>Initializes a new instance of the EventHandlers class.</summary>
+        /// <param name="client">The Discord socket client instance.</param>
+        /// <param name="interactions">The interaction service instance for handling Discord interactions.</param>
+        /// <param name="supabaseClient">The client for interacting with the Supabase database.</param>
         public EventHandlers(DiscordSocketClient client, InteractionService interactions, SupabaseClient supabaseClient)
         {
             _client = client;
@@ -20,11 +25,15 @@ namespace HartsyBot.Core
             _supabaseClient = supabaseClient;
         }
 
+        /// <summary>Registers the necessary Discord event handlers.</summary>
         public void RegisterHandlers()
         {
             _client.UserJoined += OnUserJoinedAsync;
         }
 
+        /// <summary>Handles the event when a user joins the guild, assigning roles and sending welcome messages.</summary>
+        /// <param name="user">The user who joined the guild.</param>
+        /// <returns>A task that represents the asynchronous operation.</returns>
         private async Task OnUserJoinedAsync(SocketGuildUser user)
         {
             string[] channelNames = { "welcome", "rules", "generate", "info" };
@@ -100,6 +109,9 @@ namespace HartsyBot.Core
             }
         }
 
+        /// <summary>Assigns a role to the user based on their subscription status in the database.</summary>
+        /// <param name="user">The user to assign the role to.</param>
+        /// <returns>A task that represents the asynchronous operation.</returns>
         private async Task AssignRoleBasedOnSubscription(SocketGuildUser user)
         {
             var userStatus = await _supabaseClient.GetSubStatus(user.Id.ToString());

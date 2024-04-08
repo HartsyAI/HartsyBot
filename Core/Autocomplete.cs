@@ -12,6 +12,7 @@ namespace Hartsy.Core
             _supabaseClient = supabaseClient;
         }
 
+        /// <summary>Provides autocomplete suggestions for template names by querying the list of templates from the Supabase database.</summary>
         public override async Task<AutocompletionResult> GenerateSuggestionsAsync(IInteractionContext context, IAutocompleteInteraction autocompleteInteraction, IParameterInfo parameter, IServiceProvider services)
         {
             try

@@ -23,6 +23,7 @@ namespace HartsyBot.Core
             _stableSwarmAPI = new StableSwarmAPI();
         }
 
+        /// <summary>Responds with help information about how to use the bot, including available commands.</summary>
         [SlashCommand("help", "Learn how to use the bot")]
         public async Task HelpCommand()
         {
@@ -47,11 +48,12 @@ namespace HartsyBot.Core
             }
             catch (Exception ex)
             {
-                // If something goes wrong, send an error message
                 await RespondAsync($"An error occurred: {ex.Message}", ephemeral: true);
             }
         }
 
+        /// <summary>Retrieves and displays information about a specified user or the user who invoked the command.</summary>
+        /// <param name="targetUser">The user to get information about. If not specified, the invoking user's information is displayed.</param>
         [SlashCommand("user_info", "Get information about the user.")]
         public async Task UserInfoCommand(
         [Summary("user", "The user to get information about.")] SocketGuildUser? targetUser = null)
@@ -89,7 +91,6 @@ namespace HartsyBot.Core
                         .WithThumbnailUrl(userInfo.Avatar_URL ?? user.GetAvatarUrl() ?? user.GetDefaultAvatarUrl())
                         .AddField("Full Name", userInfo.Name ?? "N/A", true)
                         .AddField("Email", userInfo.Email ?? "N/A", true)
-                        //.AddField("Subscription Level", subscriptionInfo != null ? subscriptionInfo.PlanName ?? "Active" : "No Subscription", true)
                         .AddField("Credit Limit", userInfo.Credit?.ToString() ?? "N/A", true)
                         .AddField("Likes", userInfo.Likes?.ToString() ?? "0", true);
 
@@ -122,6 +123,10 @@ namespace HartsyBot.Core
             }
         }
 
+        /// <summary>Generates an image based on the provided text and template, consuming GPUTs in the process.</summary>
+        /// <param name="text">The text to include in the image.</param>
+        /// <param name="template">The template to use for the image generation.</param>
+        /// <param name="description">Additional details to add to the prompt.</param>
         [SlashCommand("generate", "Generate an image. THIS WILL USE GPUTs")]
         public async Task ImageGenerationCommand(
             [Summary("text", "The text you want to appear in the image.")] string text,
@@ -187,6 +192,9 @@ namespace HartsyBot.Core
             }
         }
 
+        /// <summary>Adds a subscription role to the user based on their subscription status.</summary>
+        /// <param name="user">The user to add the subscription role to.</param>
+        /// <param name="subStatus">The subscription status of the user.</param>
         public async Task AddSubRole(SocketGuildUser user, string subStatus)
         {
             var subRole = user.Guild.Roles.FirstOrDefault(role => role.Name.Equals(subStatus, StringComparison.OrdinalIgnoreCase));
@@ -196,6 +204,8 @@ namespace HartsyBot.Core
             }
         }
 
+        /// <summary>Notifies the user of subscription failure due to lack of valid subscription or insufficient credits.</summary>
+        /// <param name="context">The interaction context to respond to.</param>
         public async Task HandleSubscriptionFailure(IInteractionContext context)
         {
             var user = context.User;
@@ -221,6 +231,13 @@ namespace HartsyBot.Core
             }
         }
 
+        /// <summary>Generates an image from a given text and template, and posts it in the specified channel.</summary>
+        /// <param name="text">The text to generate the image from.</param>
+        /// <param name="template">The template to use for generating the image.</param>
+        /// <param name="channel">The channel to post the generated image in.</param>
+        /// <param name="user">The user who initiated the image generation.</param>
+        /// <param name="description">Additional description to refine the image generation.</param>
+        /// <param name="initimage">Initial image for image-to-image generation, if applicable.</param>
         public async Task GenerateFromTemplate(string text, string template, SocketTextChannel channel, 
             SocketGuildUser user, string description = null, string initimage = null)
         {
@@ -315,6 +332,9 @@ namespace HartsyBot.Core
             }
         }
 
+        /// <summary>Generates a set of interactive components (buttons) for message responses, allowing users to interact with the bot's features.</summary>
+        /// <param name="userId">The user ID to associate with the components, used for identifying the user in interaction handlers.</param>
+        /// <returns>A ComponentBuilder containing buttons for various bot functionalities like regenerate, showcase, report, and saving images.</returns>
         private ComponentBuilder GenerateComponents(ulong userId)
         {
             string customId = $"regenerate:{userId}";

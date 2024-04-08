@@ -68,6 +68,12 @@ namespace Hartsy.Core
             return gridImage.Clone();
         }
 
+        /// <summary>Saves an image asynchronously to a specified directory.</summary>
+        /// <param name="image">The image to save.</param>
+        /// <param name="username">The username associated with the image.</param>
+        /// <param name="messageId">The message ID associated with the image.</param>
+        /// <param name="imageIndex">The index of the image in the batch.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
         private static async Task SaveImageAsync(Image<Rgba32> image, string username, ulong messageId, int imageIndex)
         {
             // Check if the image is a final image based on its width
@@ -80,27 +86,41 @@ namespace Hartsy.Core
                 await image.SaveAsJpegAsync(filePath);
             }
         }
+
+        /// <summary>Adds a semi-transparent watermark to the bottom right corner of each quadrant in a grid image.</summary>
+        /// <param name="gridImage">The grid image to add the watermark to.</param>
+        /// <param name="watermarkImagePath">The path to the watermark image.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
         private static async Task AddWatermark(Image<Rgba32> gridImage, string watermarkImagePath)
         {
             try
             {
-                using var originalWatermarkImage = await Image.LoadAsync<Rgba32>(watermarkImagePath);
+                Console.WriteLine(watermarkImagePath);
+                using var watermarkImage = await Image.LoadAsync<Rgba32>(watermarkImagePath);
+                watermarkImage.Mutate(x => x.Opacity(0.3f)); // Apply 30% transparency to the watermark image
 
-                // Apply semi-transparency to the watermark image and create a clone for tiling
-                using var transparentWatermark = originalWatermarkImage.Clone(ctx => ctx.ApplyProcessor(new OpacityProcessor(0.03f)));
+                // Calculate the size of each quadrant
+                int quadrantWidth = gridImage.Width / 2;
+                int quadrantHeight = gridImage.Height / 2;
 
-                // Tile the semi-transparent watermark image across the grid
-                for (int y = 0; y < gridImage.Height; y += transparentWatermark.Height)
+                // Calculate the locations for each watermark in each quadrant
+                var locations = new[]
                 {
-                    for (int x = 0; x < gridImage.Width; x += transparentWatermark.Width)
-                    {
-                        gridImage.Mutate(ctx => ctx.DrawImage(transparentWatermark, new Point(x, y), 1f));
-                    }
+            new Point(quadrantWidth - watermarkImage.Width, quadrantHeight - watermarkImage.Height),
+            new Point(gridImage.Width - watermarkImage.Width, quadrantHeight - watermarkImage.Height),
+            new Point(quadrantWidth - watermarkImage.Width, gridImage.Height - watermarkImage.Height),
+            new Point(gridImage.Width - watermarkImage.Width, gridImage.Height - watermarkImage.Height)
+        };
+
+                // Draw the watermark image on each quadrant
+                foreach (var location in locations)
+                {
+                    gridImage.Mutate(x => x.DrawImage(watermarkImage, location, 1f));
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error adding watermark: {ex.Message}");
+                Console.WriteLine($"ERROR: Failed to add Watermark: {ex}");
             }
         }
     }

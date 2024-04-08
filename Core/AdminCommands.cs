@@ -14,6 +14,7 @@ namespace Hartsy.Core
             _supabaseClient = supabaseClient;
         }
 
+        /// <summary>Initiates adding a new template, accessible only by users with the "HARTSY Staff" role. Displays a modal for entering template details.</summary>
         [SlashCommand("add-template", "Add a new template")]
         public async Task AddTemplateCommand()
         {
@@ -46,6 +47,8 @@ namespace Hartsy.Core
             }
         }
 
+        /// <summary>Handles the submission of the add template modal and saves the new template details to the database.</summary>
+        /// <param name="addTemplateModal">The modal containing the template details.</param>
         [ModalInteraction("add_template_modal")]
         public async Task OnTemplateModalSubmit(AddTemplateModal addTemplateModal)
         {
@@ -76,6 +79,7 @@ namespace Hartsy.Core
             await RespondAsync($"Template '{name}' added successfully.", ephemeral: true);
         }
 
+        /// <summary>Represents a modal for adding a new template, containing input fields for the template's name, description, and positive prompt.</summary>
         public class AddTemplateModal : IModal
         {
             public string Title => "Add New Template";
@@ -102,6 +106,7 @@ namespace Hartsy.Core
             }
         }
 
+        /// <summary>Initiates the setup or updating of server rules, accessible only by users with the "HARTSY Staff" role. Displays a modal to enter or update the server rules.</summary>
         [SlashCommand("setup_rules", "Set up rules for the server.")]
         public async Task SetupRulesCommand()
         {
@@ -156,6 +161,8 @@ namespace Hartsy.Core
             }
         }
 
+        /// <summary>Handles the submission of the server rules setup modal and updates the rules message in the specified channel.</summary>
+        /// <param name="modal">The modal containing the updated rules data.</param>
         [ModalInteraction("setup_rules_modal")]
         public async Task OnRulesModalSubmit(RulesModal modal)
         {
@@ -222,6 +229,8 @@ namespace Hartsy.Core
             }
         }
 
+        /// <summary>Represents a modal for setting up or updating server rules, containing input fields for the server's description, 
+        /// rules, code of conduct, our story, and button function explanation.</summary>
         public class RulesModal : IModal
         {
             public string Title => "Server Rules";
