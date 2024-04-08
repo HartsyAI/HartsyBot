@@ -34,24 +34,30 @@ namespace Hartsy.Core
                 .WithButton("Report", customId: "report:admin", style: ButtonStyle.Secondary, emote: new Emoji("\u26A0")) // ⚠
                 .WithButton(" ", customId: $"delete:{user.Id}", style: ButtonStyle.Danger, emote: new Emoji("\uD83D\uDDD1")) // 🗑
                 .Build();
-            // Load the image file as an attachment
-            using var fileStream = new FileStream(imagePath, FileMode.Open);
-            var filename = Path.GetFileName(imagePath);
-            filename = filename.Replace(":", "_");
-            Console.WriteLine($"Uploading image: {filename}");
+            try
+            {
+                // Load the image file as an attachment
+                using var fileStream = new FileStream(imagePath, FileMode.Open);
+                var filename = Path.GetFileName(imagePath);
+                filename = filename.Replace(":", "_");
 
-            var embed = new EmbedBuilder()
-                .WithTitle("Showcase Image")
-                .WithDescription($"Submitted by {user.Username}")
-                .WithThumbnailUrl(user.GetAvatarUrl() ?? user.GetDefaultAvatarUrl())
-                .WithImageUrl($"attachment://{filename}")
-                .AddField("Upvotes", "None", true)
-                .WithFooter("Total Votes: 0")
-                .Build();
+                var embed = new EmbedBuilder()
+                    .WithTitle("Showcase Image")
+                    .WithDescription($"Submitted by {user.Username}")
+                    .WithThumbnailUrl(user.GetAvatarUrl() ?? user.GetDefaultAvatarUrl())
+                    .WithImageUrl($"attachment://{filename}")
+                    .AddField("Upvotes", "None", true)
+                    .WithFooter("Total Votes: 0")
+                    .Build();
 
-            var fileAttachment = new FileAttachment(fileStream, filename);
-            var message = await showcaseChannel.SendFileAsync(attachment: fileAttachment, text: null, embed: embed, components: components);
-            await showcaseChannel.CreateThreadAsync($"Discuss Showcase by {user.Username}", autoArchiveDuration: ThreadArchiveDuration.OneDay, message: message);
+                var fileAttachment = new FileAttachment(fileStream, filename);
+                var message = await showcaseChannel.SendFileAsync(attachment: fileAttachment, text: null, embed: embed, components: components);
+                await showcaseChannel.CreateThreadAsync($"Discuss Showcase by {user.Username}", autoArchiveDuration: ThreadArchiveDuration.OneDay, message: message);
+            }
+            catch (Exception ex)
+            {
+                   Console.WriteLine($"Error showcasing image: {ex.Message}");
+            }
         }
 
         /// <summary> Updates the vote count for a showcased image. This method handles user votes on images

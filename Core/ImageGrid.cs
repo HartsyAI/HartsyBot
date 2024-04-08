@@ -82,18 +82,25 @@ namespace Hartsy.Core
         }
         private static async Task AddWatermark(Image<Rgba32> gridImage, string watermarkImagePath)
         {
-            using var originalWatermarkImage = await Image.LoadAsync<Rgba32>(watermarkImagePath);
-
-            // Apply semi-transparency to the watermark image and create a clone for tiling
-            using var transparentWatermark = originalWatermarkImage.Clone(ctx => ctx.ApplyProcessor(new OpacityProcessor(0.03f)));
-
-            // Tile the semi-transparent watermark image across the grid
-            for (int y = 0; y < gridImage.Height; y += transparentWatermark.Height)
+            try
             {
-                for (int x = 0; x < gridImage.Width; x += transparentWatermark.Width)
+                using var originalWatermarkImage = await Image.LoadAsync<Rgba32>(watermarkImagePath);
+
+                // Apply semi-transparency to the watermark image and create a clone for tiling
+                using var transparentWatermark = originalWatermarkImage.Clone(ctx => ctx.ApplyProcessor(new OpacityProcessor(0.03f)));
+
+                // Tile the semi-transparent watermark image across the grid
+                for (int y = 0; y < gridImage.Height; y += transparentWatermark.Height)
                 {
-                    gridImage.Mutate(ctx => ctx.DrawImage(transparentWatermark, new Point(x, y), 1f));
+                    for (int x = 0; x < gridImage.Width; x += transparentWatermark.Width)
+                    {
+                        gridImage.Mutate(ctx => ctx.DrawImage(transparentWatermark, new Point(x, y), 1f));
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error adding watermark: {ex.Message}");
             }
         }
     }
