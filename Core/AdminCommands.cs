@@ -1,18 +1,12 @@
 ﻿using Discord.Interactions;
 using Discord;
-using static SupabaseClient;
 using Discord.WebSocket;
 
 namespace Hartsy.Core
 {
-    public class AdminCommands : InteractionModuleBase<SocketInteractionContext>
+    public class AdminCommands(SupabaseClient supabaseClient) : InteractionModuleBase<SocketInteractionContext>
     {
-        private readonly SupabaseClient _supabaseClient;
-
-        public AdminCommands(SupabaseClient supabaseClient)
-        {
-            _supabaseClient = supabaseClient;
-        }
+        private readonly SupabaseClient _supabaseClient = supabaseClient;
 
         /// <summary>Initiates adding a new template, accessible only by users with the "HARTSY Staff" role. Displays a modal for entering template details.</summary>
         [SlashCommand("add-template", "Add a new template")]
@@ -57,7 +51,7 @@ namespace Hartsy.Core
             string description = addTemplateModal.Description;
             string positive = addTemplateModal.Positive;
 
-            Template newTemplate = new Template
+            SupabaseClient.Template newTemplate = new()
             {
                 Prompt = "not used",
                 Name = name,
@@ -72,7 +66,6 @@ namespace Hartsy.Core
                 Active = true,
                 UserId = null,
             };
-
             // Save the new template to the database
             await _supabaseClient.AddTemplate(newTemplate);
 

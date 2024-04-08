@@ -4,26 +4,18 @@ using System.Net.Mail;
 
 namespace Hartsy.Core
 {
-    public class Showcase
+    public class Showcase()
     {
-        private readonly DiscordSocketClient _client;
-
-        public Showcase(DiscordSocketClient client)
-        {
-            _client = client;
-        }
-
         /// <summary>Showcases an image in the showcase channel. This method is used to display
         /// images in the showcase channel. It creates a new message in the showcase channel with the image attached.</summary>
         /// <param name="guild">The guild where the showcase channel is located.</param>
         /// <param name="imagePath">The path to the image file to showcase.</param>
         /// <param name="user">The user who submitted the image.</param>
         /// <returns>A Task that represents the asynchronous operation of showcasing an image.</returns>
-        public async Task ShowcaseImageAsync(IGuild guild, string imagePath, IUser user)
+        public static async Task ShowcaseImageAsync(IGuild guild, string imagePath, IUser user)
         {
             var channels = await guild.GetChannelsAsync();
-            var showcaseChannel = channels.FirstOrDefault(x => x.Name == "showcase") as ITextChannel;
-            if (showcaseChannel == null)
+            if (channels.FirstOrDefault(x => x.Name == "showcase") is not ITextChannel showcaseChannel)
             {
                 Console.WriteLine("Showcase channel not found.");
                 return;
@@ -60,6 +52,8 @@ namespace Hartsy.Core
             }
         }
 
+        private static readonly char[] separator = [','];
+
         /// <summary> Updates the vote count for a showcased image. This method handles user votes on images
         /// displayed in the showcase channel. It ensures users can vote for images,
         /// and that they can only vote once per image. It modifies the embed associated with the image
@@ -68,10 +62,9 @@ namespace Hartsy.Core
         /// <param name="messageId">The ID of the message being voted on.</param>
         /// <param name="user">The user who is voting.</param>
         /// <returns>A Task that represents the asynchronous operation of updating the vote on a message.</returns>
-        public async Task UpdateVoteAsync(IMessageChannel channel, ulong messageId, IUser user)
+        public static async Task UpdateVoteAsync(IMessageChannel channel, ulong messageId, IUser user)
         {
-            var message = await channel.GetMessageAsync(messageId) as IUserMessage;
-            if (message == null) return;
+            if (await channel.GetMessageAsync(messageId) is not IUserMessage message) return;
 
             var embed = message.Embeds.FirstOrDefault();
             if (embed == null) return;
@@ -79,7 +72,8 @@ namespace Hartsy.Core
             var builder = embed.ToEmbedBuilder();
             var upvotesField = builder.Fields.FirstOrDefault(f => f.Name == "Upvotes");
 
-            var upvotes = upvotesField != null ? upvotesField.Value.ToString().Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(v => v.Trim()).ToList() : new List<string>();
+            var upvotes = upvotesField != null ? upvotesField.Value.ToString().Split(separator, 
+                StringSplitOptions.RemoveEmptyEntries).Select(v => v.Trim()).ToList() : [];
 
             upvotes.Remove("None");
             upvotes.RemoveAll(vote => vote == user.Username);
@@ -107,11 +101,10 @@ namespace Hartsy.Core
         /// <param name="guild"></param>
         /// <param name="message"></param>
         /// <returns></returns>
-        private async Task SendToTopHartists(IGuild guild, IUserMessage message)
+        private static async Task SendToTopHartists(IGuild guild, IUserMessage message)
         {
             var channels = await guild.GetChannelsAsync();
-            var topHartistsChannel = channels.FirstOrDefault(x => x.Name == "top-hartists") as ITextChannel;
-            if (topHartistsChannel == null)
+            if (channels.FirstOrDefault(x => x.Name == "top-hartists") is not ITextChannel topHartistsChannel)
             {
                 Console.WriteLine("Top-Hartists channel not found.");
                 return;

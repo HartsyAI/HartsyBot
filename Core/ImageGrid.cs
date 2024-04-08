@@ -54,15 +54,15 @@ namespace Hartsy.Core
                         await SaveImageAsync(image, username, messageId, index);
 
                     }
-                    if (!isPreview)
-                    {
-                        await AddWatermark(gridImage, "../../../images/logo.png");
-                    }
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"Error processing base64 image data: {ex.Message}");
                 }
+            }
+            if (!isPreview)
+            {
+                await AddWatermark(gridImage, "../../../images/logo.png");
             }
             // Clone the gridImage to avoid disposal issues
             return gridImage.Clone();
@@ -97,7 +97,7 @@ namespace Hartsy.Core
             {
                 Console.WriteLine(watermarkImagePath);
                 using var watermarkImage = await Image.LoadAsync<Rgba32>(watermarkImagePath);
-                watermarkImage.Mutate(x => x.Opacity(0.3f)); // Apply 30% transparency to the watermark image
+                watermarkImage.Mutate(x => x.Opacity(0.2f)); // Apply 30% transparency to the watermark image
 
                 // Calculate the size of each quadrant
                 int quadrantWidth = gridImage.Width / 2;

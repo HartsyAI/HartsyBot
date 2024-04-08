@@ -9,7 +9,7 @@ namespace Hartsy.Core
 {
     public class StableSwarmAPI
     {
-        private static readonly HttpClient Client = new HttpClient();
+        private static readonly HttpClient Client = new();
         private readonly string _swarmURL;
         private static int batchCount = 0;
         private const int batchProcessFrequency = 2;
@@ -25,7 +25,7 @@ namespace Hartsy.Core
         {
             try
             {
-                JObject sessData = await PostJson($"{_swarmURL}/API/GetNewSession", new JObject());
+                JObject sessData = await PostJson($"{_swarmURL}/API/GetNewSession", []);
                 string sessionId = sessData["session_id"].ToString();
                 Console.WriteLine($"Session acquired successfully: {sessionId}");
                 return sessionId;
@@ -44,7 +44,7 @@ namespace Hartsy.Core
         {
             if (webSocket.State != WebSocketState.Open)
             {
-                Uri serverUri = new Uri($"{_swarmURL.Replace("http", "ws")}/API/GenerateText2ImageWS");
+                Uri serverUri = new($"{_swarmURL.Replace("http", "ws")}/API/GenerateText2ImageWS");
                 await webSocket.ConnectAsync(serverUri, CancellationToken.None);
             }
         }
@@ -53,10 +53,10 @@ namespace Hartsy.Core
         /// <param name="webSocket">The WebSocket to send the request through.</param>
         /// <param name="request">The request object to be sent.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
-        private async Task SendRequestAsync(ClientWebSocket webSocket, object request)
+        private static async Task SendRequestAsync(ClientWebSocket webSocket, object request)
         {
             string requestJson = JsonConvert.SerializeObject(request);
-            ArraySegment<byte> buffer = new ArraySegment<byte>(Encoding.UTF8.GetBytes(requestJson));
+            ArraySegment<byte> buffer = new(Encoding.UTF8.GetBytes(requestJson));
             await webSocket.SendAsync(buffer, WebSocketMessageType.Text, true, CancellationToken.None);
         }
 
@@ -65,7 +65,8 @@ namespace Hartsy.Core
         /// <param name="stringBuilder">The StringBuilder to append the received message to.</param>
         /// <param name="responseBuffer">The buffer to store the response bytes.</param>
         /// <returns>A task that represents the asynchronous operation. The task result contains the WebSocket receive result.</returns>
-        private async Task<WebSocketReceiveResult> ReceiveMessage(ClientWebSocket webSocket, StringBuilder stringBuilder, ArraySegment<byte> responseBuffer)
+        private static async Task<WebSocketReceiveResult> ReceiveMessage(ClientWebSocket webSocket, 
+            StringBuilder stringBuilder, ArraySegment<byte> responseBuffer)
         {
             WebSocketReceiveResult result;
             do
@@ -109,10 +110,10 @@ namespace Hartsy.Core
             await SendRequestAsync(webSocket, request);
 
             var responseBuffer = new ArraySegment<byte>(new byte[8192]);
-            StringBuilder stringBuilder = new StringBuilder();
+            StringBuilder stringBuilder = new();
 
-            Dictionary<int, Dictionary<string, string>> previewImages = new Dictionary<int, Dictionary<string, string>>();
-            Dictionary<int, Dictionary<string, string>> finalImages = new Dictionary<int, Dictionary<string, string>>();
+            Dictionary<int, Dictionary<string, string>> previewImages = [];
+            Dictionary<int, Dictionary<string, string>> finalImages = [];
 
             while (webSocket.State == WebSocketState.Open)
             {
@@ -122,8 +123,8 @@ namespace Hartsy.Core
                 if (result.MessageType == WebSocketMessageType.Close)
                     break;
                 string jsonString = stringBuilder.ToString();
-                string logString = ReplaceBase64(jsonString);
-                Console.WriteLine("Response JSON (excluding base64 data): " + logString);
+                //string logString = ReplaceBase64(jsonString); // DEBUG ONLY
+                //Console.WriteLine("Response JSON (excluding base64 data): " + logString); // DEBUG ONLY
                 var responseData = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonString);
 
                 foreach (var kvp in responseData)
@@ -157,7 +158,7 @@ namespace Hartsy.Core
                                 }
                                 // TODO: Do we waant to do something with the status data?
                             }
-                            else if (responseData.ContainsKey("status") && responseData["status"] is Dictionary<string, object> statusData)
+                            else if (responseData.TryGetValue("status", out object? pair) && pair is Dictionary<string, object> statusData)
                             {
                                 // List of expected status fields
                                 var statusFields = new[] { "waiting_gens", "loading_models", "waiting_backends", "live_gens" };
@@ -165,16 +166,16 @@ namespace Hartsy.Core
                                 foreach (var field in statusFields)
                                 {
                                     // Safely get the value of each field, defaulting to 0 if not found
-                                    statusData.TryGetValue(field, out object value);
+                                    statusData.TryGetValue(field, out object data );
                                 }
                             }
                         }
 
-                        if (responseData.ContainsKey("image"))
+                        if (responseData.TryGetValue("image", out object? value))
                         {
                             bool isFinal = true;
                             int batchIndex = Convert.ToInt32(responseData["batch_index"]);
-                            string base64WithPrefix = responseData["image"].ToString();
+                            string base64WithPrefix = value.ToString();
                             string base64 = await RemovePrefix(base64WithPrefix);
                             finalImages[batchIndex] = new Dictionary<string, string> { { "base64", $"{base64}" } };
                             
@@ -195,12 +196,12 @@ namespace Hartsy.Core
         /// <param name="jsonString">The JSON string containing base64 image data.</param>
         /// <returns>A string where base64 image data is replaced with a placeholder.</returns>
         // DEBUG ONLY
-        private string ReplaceBase64(string jsonString)
+        private static string ReplaceBase64(string jsonString)
         {
             const string previewPrefix = "\"preview\":\"data:image/jpeg;base64,";
             const string imagePrefix = "\"image\":\"data:image/jpeg;base64,";
 
-            string ReplaceBase64Content(string str, string prefix)
+            static string ReplaceBase64Content(string str, string prefix)
             {
                 int start = str.IndexOf(prefix);
                 while (start != -1)
@@ -226,7 +227,8 @@ namespace Hartsy.Core
         /// and the value is another dictionary containing image base64.</param>
         /// <param name="batchCount">How many batches have been processed.</param>
         /// <returns>A grid image of the preview images for the batch if count meets frequency; otherwise, null.</returns>
-        private async Task<Image<Rgba32>> HandlePreview(Dictionary<int, Dictionary<string, string>> previewImages, int batchCount, string username, ulong messageId)
+        private static async Task<Image<Rgba32>?> HandlePreview(Dictionary<int, Dictionary<string, string>> previewImages, 
+            int batchCount, string username, ulong messageId)
         {
             if (batchCount % batchProcessFrequency == 0)
             {
@@ -239,7 +241,7 @@ namespace Hartsy.Core
         /// <summary>Processes the final images, generating a grid image from the base64.</summary>
         /// <param name="finalImages">A dictionary where each key represents a batch index, another dictionary containing base64.</param>
         /// <returns>A grid image composed of the final images.</returns>
-        private async Task<Image<Rgba32>> HandleFinal(Dictionary<int, Dictionary<string, string>> finalImages, string username, ulong messageId)
+        private static async Task<Image<Rgba32>> HandleFinal(Dictionary<int, Dictionary<string, string>> finalImages, string username, ulong messageId)
         {
             Image<Rgba32> gridImage = await ImageGrid.CreateGridAsync(finalImages, username, messageId);
             return gridImage;
@@ -248,7 +250,7 @@ namespace Hartsy.Core
         /// <summary>Handles the status updates from the WebSocket connection.</summary>
         /// <param name="status">The dictionary containing status information.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
-        private async Task HandleStatus(Dictionary<int, Dictionary<string, string>> status)
+        private static async Task HandleStatus(Dictionary<int, Dictionary<string, string>> status)
         {
             Console.WriteLine("Status received");
         }
@@ -266,7 +268,7 @@ namespace Hartsy.Core
             int base64StartIndex = base64.IndexOf(base64Prefix);
             if (base64StartIndex != -1)
             {
-                base64 = base64.Substring(base64StartIndex + base64Prefix.Length);
+                base64 = base64[(base64StartIndex + base64Prefix.Length)..];
             }
             return Task.FromResult(base64);
         }

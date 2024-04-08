@@ -1,29 +1,16 @@
 ﻿using Discord;
-using Discord.Interactions;
 using Discord.WebSocket;
-using Supabase;
-using Supabase.Interfaces;
-using System;
 
-namespace HartsyBot.Core
+namespace Hartsy.Core
 {
     /// <summary>Handles Discord events and interactions for the bot, including user joins and role assignments based on subscription status.</summary>
-    public class EventHandlers
+    /// <remarks>Initializes a new instance of the EventHandlers class.</remarks>
+    /// <param name="client">The Discord socket client instance.</param>
+    /// <param name="supabaseClient">The client for interacting with the Supabase database.</param>
+    public class EventHandlers(DiscordSocketClient client, SupabaseClient supabaseClient)
     {
-        private readonly DiscordSocketClient _client;
-        private readonly InteractionService _interactions;
-        private readonly SupabaseClient _supabaseClient;
-
-        /// <summary>Initializes a new instance of the EventHandlers class.</summary>
-        /// <param name="client">The Discord socket client instance.</param>
-        /// <param name="interactions">The interaction service instance for handling Discord interactions.</param>
-        /// <param name="supabaseClient">The client for interacting with the Supabase database.</param>
-        public EventHandlers(DiscordSocketClient client, InteractionService interactions, SupabaseClient supabaseClient)
-        {
-            _client = client;
-            _interactions = interactions;
-            _supabaseClient = supabaseClient;
-        }
+        private readonly DiscordSocketClient _client = client;
+        private readonly SupabaseClient _supabaseClient = supabaseClient;
 
         /// <summary>Registers the necessary Discord event handlers.</summary>
         public void RegisterHandlers()
@@ -36,8 +23,8 @@ namespace HartsyBot.Core
         /// <returns>A task that represents the asynchronous operation.</returns>
         private async Task OnUserJoinedAsync(SocketGuildUser user)
         {
-            string[] channelNames = { "welcome", "rules", "generate", "info" };
-            Dictionary<string, SocketTextChannel> channels = new Dictionary<string, SocketTextChannel>();
+            string[] channelNames = ["welcome", "rules", "generate", "info"];
+            Dictionary<string, SocketTextChannel> channels = [];
 
             foreach (var name in channelNames)
             {
@@ -115,9 +102,9 @@ namespace HartsyBot.Core
         private async Task AssignRoleBasedOnSubscription(SocketGuildUser user)
         {
             var userStatus = await _supabaseClient.GetSubStatus(user.Id.ToString());
-            if (userStatus != null && userStatus.ContainsKey("PlanName"))
+            if (userStatus != null && userStatus.TryGetValue("PlanName", out object? value))
             {
-                string subStatus = userStatus["PlanName"].ToString() ?? "Free";
+                string subStatus = value.ToString() ?? "Free";
                 var subRole = user.Guild.Roles.FirstOrDefault(role => role.Name.Equals(subStatus, StringComparison.OrdinalIgnoreCase));
                 await user.AddRoleAsync(subRole);
             }

@@ -1,16 +1,9 @@
 ﻿using Discord.Interactions;
 using Discord.WebSocket;
 using Discord;
-using Hartsy.Core;
-using System.Drawing;
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Processing;
-using static SupabaseClient;
-using Supabase.Gotrue;
-using System.Reactive.Concurrency;
-using System.Reflection;
 
-namespace HartsyBot.Core
+namespace Hartsy.Core
 {
     public class Commands : InteractionModuleBase<SocketInteractionContext>
     {
@@ -166,7 +159,7 @@ namespace HartsyBot.Core
             // Check if the user has a valid subscription and enough credits
             if (subStatus != null && userInfo.Credit > 0)
             {
-                bool creditUpdated = await _supabaseClient.UpdateUserCredit(user.Id.ToString(), credits);
+                await _supabaseClient.UpdateUserCredit(user.Id.ToString(), credits);
                 var embed = new EmbedBuilder()
                     .WithTitle("Image Generation")
                     .WithDescription($"You have {credits} GPUT. You will have {credits - 1} GPUT after this image is generated.")
@@ -195,7 +188,7 @@ namespace HartsyBot.Core
         /// <summary>Adds a subscription role to the user based on their subscription status.</summary>
         /// <param name="user">The user to add the subscription role to.</param>
         /// <param name="subStatus">The subscription status of the user.</param>
-        public async Task AddSubRole(SocketGuildUser user, string subStatus)
+        public static async Task AddSubRole(SocketGuildUser user, string subStatus)
         {
             var subRole = user.Guild.Roles.FirstOrDefault(role => role.Name.Equals(subStatus, StringComparison.OrdinalIgnoreCase));
             if (subRole != null && !user.Roles.Contains(subRole))
@@ -206,7 +199,7 @@ namespace HartsyBot.Core
 
         /// <summary>Notifies the user of subscription failure due to lack of valid subscription or insufficient credits.</summary>
         /// <param name="context">The interaction context to respond to.</param>
-        public async Task HandleSubscriptionFailure(IInteractionContext context)
+        public static async Task HandleSubscriptionFailure(IInteractionContext context)
         {
             var user = context.User;
             var embed = new EmbedBuilder()
@@ -335,7 +328,7 @@ namespace HartsyBot.Core
         /// <summary>Generates a set of interactive components (buttons) for message responses, allowing users to interact with the bot's features.</summary>
         /// <param name="userId">The user ID to associate with the components, used for identifying the user in interaction handlers.</param>
         /// <returns>A ComponentBuilder containing buttons for various bot functionalities like regenerate, showcase, report, and saving images.</returns>
-        private ComponentBuilder GenerateComponents(ulong userId)
+        private static ComponentBuilder GenerateComponents(ulong userId)
         {
             string customId = $"regenerate:{userId}";
             string deleteCustomId = $"delete:{userId}";

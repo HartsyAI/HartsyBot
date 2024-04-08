@@ -4,9 +4,7 @@ using Discord.Interactions;
 using dotenv.net;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
-using System;
 using Hartsy.Core;
-using HartsyBot.Core;
 
 namespace HartsyBot
 {
@@ -15,7 +13,7 @@ namespace HartsyBot
         private DiscordSocketClient? _client;
         private InteractionService? _interactions;
         private IServiceProvider? _serviceProvider;
-        private IServiceCollection? _services;
+        private readonly IServiceCollection? _services;
 
         public object? Context { get; private set; }
 
@@ -37,7 +35,7 @@ namespace HartsyBot
 
                 if (File.Exists(envFilePath))
                 {
-                    var envOptions = new DotEnvOptions(envFilePaths: new[] { envFilePath });
+                    var envOptions = new DotEnvOptions(envFilePaths: [envFilePath]);
                     DotEnv.Load(envOptions);
                     token = Environment.GetEnvironmentVariable("BOT_TOKEN");
                 }
@@ -55,11 +53,11 @@ namespace HartsyBot
 
             _client.Log += Log;
             _interactions.Log += Log;
-            _client.Ready += () => ReadyAsync(_serviceProvider);
+            _client.Ready += () => ReadyAsync();
 
             // Initialize and register event handlers
             var supabaseClient = _serviceProvider.GetRequiredService<SupabaseClient>();
-            var eventHandlers = new Core.EventHandlers(_client, _interactions, supabaseClient);
+            var eventHandlers = new EventHandlers(_client, supabaseClient);
             eventHandlers.RegisterHandlers();
 
             if (string.IsNullOrEmpty(token))
@@ -77,7 +75,7 @@ namespace HartsyBot
 
         /// <summary>Configures and provides the services used by the bot, including Discord client, interaction service, and command handling.</summary>
         /// <returns>A ServiceProvider containing the configured services.</returns>
-        private ServiceProvider ConfigureServices()
+        private static ServiceProvider ConfigureServices()
         {
             return new ServiceCollection()
                 .AddSingleton(new DiscordSocketClient(new DiscordSocketConfig
@@ -98,12 +96,12 @@ namespace HartsyBot
         /// <summary>Executes tasks when the bot client is ready, such as command registration and initialization. It registers commands to guilds and sets the bot status.</summary>
         /// <param name="services">The service provider containing registered services.</param>
         /// <returns>A Task representing the asynchronous operation.</returns>
-        private async Task ReadyAsync(IServiceProvider services)
+        private async Task ReadyAsync()
         {
             try
             {
                 // Things to be run when the bot is ready
-                if (_client.Guilds.Any())
+                if (_client.Guilds.Count != 0)
                 {
                     // Register command modules with the InteractionService.
                     // Tells  to scan the whole assembly for classes that define slash commands.

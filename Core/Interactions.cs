@@ -1,32 +1,14 @@
-﻿using System.ComponentModel;
-using System.Text.RegularExpressions;
-using System.Threading.Channels;
+﻿using System.Text.RegularExpressions;
 using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
-using Hartsy.Core;
-using Microsoft.VisualBasic;
-using Supabase.Gotrue;
-using Supabase.Interfaces;
 
-namespace HartsyBot.Core
+namespace Hartsy.Core
 {
-    public class InteractionHandlers : InteractionModuleBase<SocketInteractionContext>
+    public class InteractionHandlers(Commands commands, SupabaseClient supabaseClient) : InteractionModuleBase<SocketInteractionContext>
     {
-
-        private readonly DiscordSocketClient _client;
-        private readonly Showcase _showcase;
-        private readonly Commands _commands;
-        private readonly SupabaseClient _supabaseClient;
-
-        public InteractionHandlers(DiscordSocketClient client, Showcase showcase, Commands commands, SupabaseClient supabaseClient)
-        {
-            _client = client;
-            _showcase = showcase;
-            _commands = commands;
-            _supabaseClient = supabaseClient;
-        }
-
+        private readonly Commands _commands = commands;
+        private readonly SupabaseClient _supabaseClient = supabaseClient;
         private static readonly Dictionary<(ulong, string), DateTime> _lastInteracted = [];
         private static readonly TimeSpan Cooldown = TimeSpan.FromSeconds(3); // 3 seconds cooldown
 
@@ -151,7 +133,7 @@ namespace HartsyBot.Core
                 return;
             }
             var message = (Context.Interaction as SocketMessageComponent)?.Message;
-            if (message == null || !message.Embeds.Any())
+            if (message == null || message.Embeds.Count == 0)
             {
                 Console.WriteLine("Message or embeds are null/empty");
                 await FollowupAsync("Error: Message or embeds are missing.", ephemeral: true);
@@ -169,7 +151,7 @@ namespace HartsyBot.Core
             if (userInfo == null)
             {
                 Console.WriteLine("userInfo is null - User not found in database.");
-                await _commands.HandleSubscriptionFailure(Context);
+                await Commands.HandleSubscriptionFailure(Context);
                 return;
             }
 
@@ -177,11 +159,11 @@ namespace HartsyBot.Core
             if (subStatus == null || userInfo.Credit <= 0)
             {
                 Console.WriteLine($"Subscription status or credit issue. Status: {subStatus}, Credits: {userInfo.Credit}");
-                await _commands.HandleSubscriptionFailure(Context);
+                await Commands.HandleSubscriptionFailure(Context);
                 return;
             }
             int credits = userInfo.Credit ?? 0;
-            bool creditUpdated = await _supabaseClient.UpdateUserCredit(user.Id.ToString(), credits - 1);
+            await _supabaseClient.UpdateUserCredit(user.Id.ToString(), credits - 1);
 
             var creditEmbed = new EmbedBuilder()
                     .WithTitle("Image Generation")
@@ -199,7 +181,7 @@ namespace HartsyBot.Core
         /// <summary>Parses the embed to extract text, description, and template information.</summary>
         /// <param name="embed">The embed to parse.</param>
         /// <returns>A tuple containing the text, description, and template extracted from the embed.</returns>
-        private (string text, string description, string template) ParseEmbed(IEmbed embed)
+        private static (string text, string description, string template) ParseEmbed(IEmbed embed)
         {
             string embedDescription = embed.Description ?? "";
 
@@ -314,11 +296,11 @@ namespace HartsyBot.Core
             switch (customId)
             {
                 case "up":
-                    await _showcase.UpdateVoteAsync(channel, messageId, Context.User);
+                    await Showcase.UpdateVoteAsync(channel, messageId, Context.User);
                     await RespondAsync("You upvoted this image!", ephemeral: true);
                     break;
                 case "down":
-                    await _showcase.UpdateVoteAsync(channel, messageId, Context.User);
+                    await Showcase.UpdateVoteAsync(channel, messageId, Context.User);
                     await RespondAsync("You downvoted this image!", ephemeral: true);
                     break;
                 default:
@@ -537,11 +519,11 @@ namespace HartsyBot.Core
                         if (subStatus == null || userInfo.Credit <= 0)
                         {
                             Console.WriteLine($"Subscription status or credit issue. Status: {subStatus}, Credits: {userInfo.Credit}");
-                            await _commands.HandleSubscriptionFailure(Context);
+                            await Commands.HandleSubscriptionFailure(Context);
                             return;
                         }
                         int credits = userInfo.Credit ?? 0;
-                        bool creditUpdated = await _supabaseClient.UpdateUserCredit(user.Id.ToString(), credits - 1);
+                        await _supabaseClient.UpdateUserCredit(user.Id.ToString(), credits - 1);
 
                         var creditEmbed = new EmbedBuilder()
                                 .WithTitle("Image Generation")
@@ -580,7 +562,7 @@ namespace HartsyBot.Core
                     }
                     else if (actionType == "showcase")
                     {
-                        await _showcase.ShowcaseImageAsync(Context.Guild, filePath, Context.User);
+                        await Showcase.ShowcaseImageAsync(Context.Guild, filePath, Context.User);
                         await FollowupAsync("Image added to the showcase!", ephemeral: true);
                     }
                 }
