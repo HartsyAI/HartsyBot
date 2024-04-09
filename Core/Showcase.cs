@@ -72,7 +72,7 @@ namespace Hartsy.Core
             var builder = embed.ToEmbedBuilder();
             var upvotesField = builder.Fields.FirstOrDefault(f => f.Name == "Upvotes");
 
-            var upvotes = upvotesField != null ? upvotesField.Value.ToString().Split(separator, 
+            List<string> upvotes = upvotesField != null ? upvotesField.Value.ToString()!.Split(separator, 
                 StringSplitOptions.RemoveEmptyEntries).Select(v => v.Trim()).ToList() : [];
 
             upvotes.Remove("None");
@@ -91,8 +91,8 @@ namespace Hartsy.Core
             // If upvotes reach 5, send to "top-hartists" channel
             if (upvotes.Count(upvote => upvote != "None") == 5)
             {
-                var channelGuild = message.Channel as SocketGuildChannel;
-                var guild = channelGuild.Guild;
+                SocketGuildChannel? channelGuild = message.Channel as SocketGuildChannel;
+                SocketGuild guild = channelGuild!.Guild;
                 await SendToTopHartists(guild, message);
             }
         }

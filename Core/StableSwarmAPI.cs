@@ -16,7 +16,7 @@ namespace Hartsy.Core
 
         public StableSwarmAPI()
         {
-            _swarmURL = Environment.GetEnvironmentVariable("SWARM_URL");
+            _swarmURL = Environment.GetEnvironmentVariable("SWARM_URL") ?? "";
         }
 
         /// <summary>Acquires a new session ID from the API.</summary>
@@ -26,7 +26,7 @@ namespace Hartsy.Core
             try
             {
                 JObject sessData = await PostJson($"{_swarmURL}/API/GetNewSession", []);
-                string sessionId = sessData["session_id"].ToString();
+                string sessionId = sessData["session_id"]!.ToString();
                 Console.WriteLine($"Session acquired successfully: {sessionId}");
                 return sessionId;
             }
@@ -72,7 +72,7 @@ namespace Hartsy.Core
             do
             {
                 result = await webSocket.ReceiveAsync(responseBuffer, CancellationToken.None);
-                var jsonStringFragment = Encoding.UTF8.GetString(responseBuffer.Array, responseBuffer.Offset, result.Count);
+                var jsonStringFragment = Encoding.UTF8.GetString(responseBuffer.Array!, responseBuffer.Offset, result.Count);
                 stringBuilder.Append(jsonStringFragment);
             } while (!result.EndOfMessage);
 
@@ -101,7 +101,7 @@ namespace Hartsy.Core
         /// <param name="username">The username associated with the request.</param>
         /// <param name="messageId">The message ID associated with the request for tracking purposes.</param>
         /// <returns>An async enumerable of tuples, each containing an Image object and a boolean indicating if it is the final image.</returns>
-        public async IAsyncEnumerable<(Image<Rgba32> Image, bool IsFinal)> GetImages(Dictionary<string, object> payload, string username, ulong messageId)
+        public async IAsyncEnumerable<(Image<Rgba32>? Image, bool IsFinal)> GetImages(Dictionary<string, object> payload, string username, ulong messageId)
         {
             var webSocket = new ClientWebSocket();
             await EnsureWebSocketConnectionAsync(webSocket);
@@ -125,9 +125,9 @@ namespace Hartsy.Core
                 string jsonString = stringBuilder.ToString();
                 //string logString = ReplaceBase64(jsonString); // DEBUG ONLY
                 //Console.WriteLine("Response JSON (excluding base64 data): " + logString); // DEBUG ONLY
-                var responseData = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonString);
+                Dictionary<string, object>? responseData = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonString);
 
-                foreach (var kvp in responseData)
+                foreach (var kvp in responseData!)
                 {
                     if (responseData != null)
                     {
@@ -137,15 +137,15 @@ namespace Hartsy.Core
                             {
                                 bool isFinal = false;
                                 int batchIndex = Convert.ToInt32(genProgressData["batch_index"]);
-                                string base64WithPrefix = genProgressData["preview"].ToString();
-                                string overall = genProgressData["overall_percent"].ToString();
-                                string current = genProgressData["current_percent"].ToString();
+                                string base64WithPrefix = genProgressData["preview"]!.ToString();
+                                string overall = genProgressData["overall_percent"]!.ToString();
+                                string current = genProgressData["current_percent"]!.ToString();
                                 string base64 = await RemovePrefix(base64WithPrefix);
                                 previewImages[batchIndex] = new Dictionary<string, string> { { "base64", $"{base64}" } };
                                 if (batchIndex == 3)
                                 {
                                     batchCount++;
-                                    Image<Rgba32> preview = await HandlePreview(previewImages, batchCount, username, messageId);
+                                    Image<Rgba32>? preview = await HandlePreview(previewImages, batchCount, username, messageId);
                                     if (preview == null)
                                     {
                                         continue;
@@ -166,7 +166,7 @@ namespace Hartsy.Core
                                 foreach (var field in statusFields)
                                 {
                                     // Safely get the value of each field, defaulting to 0 if not found
-                                    statusData.TryGetValue(field, out object data );
+                                    statusData.TryGetValue(field, out object? data);
                                 }
                             }
                         }
@@ -175,7 +175,7 @@ namespace Hartsy.Core
                         {
                             bool isFinal = true;
                             int batchIndex = Convert.ToInt32(responseData["batch_index"]);
-                            string base64WithPrefix = value.ToString();
+                            string base64WithPrefix = value.ToString()!;
                             string base64 = await RemovePrefix(base64WithPrefix);
                             finalImages[batchIndex] = new Dictionary<string, string> { { "base64", $"{base64}" } };
                             
@@ -196,7 +196,9 @@ namespace Hartsy.Core
         /// <param name="jsonString">The JSON string containing base64 image data.</param>
         /// <returns>A string where base64 image data is replaced with a placeholder.</returns>
         // DEBUG ONLY
+#pragma warning disable IDE0051 // Remove unused private members
         private static string ReplaceBase64(string jsonString)
+#pragma warning restore IDE0051 // Remove unused private members
         {
             const string previewPrefix = "\"preview\":\"data:image/jpeg;base64,";
             const string imagePrefix = "\"image\":\"data:image/jpeg;base64,";
@@ -206,7 +208,7 @@ namespace Hartsy.Core
                 int start = str.IndexOf(prefix);
                 while (start != -1)
                 {
-                    int end = str.IndexOf("\"", start + prefix.Length);
+                    int end = str.IndexOf('"', start + prefix.Length);
                     if (end != -1)
                     {
                         str = str.Remove(start, end - start + 1).Insert(start, $"{prefix}[BASE64_DATA]\"");
@@ -250,8 +252,12 @@ namespace Hartsy.Core
         /// <summary>Handles the status updates from the WebSocket connection.</summary>
         /// <param name="status">The dictionary containing status information.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
+#pragma warning disable IDE0051 // Remove unused private members
         private static async Task HandleStatus(Dictionary<int, Dictionary<string, string>> status)
+#pragma warning restore IDE0051 // Remove unused private members
         {
+            await Task.Delay(0);
+            Console.WriteLine(status);
             Console.WriteLine("Status received");
         }
 

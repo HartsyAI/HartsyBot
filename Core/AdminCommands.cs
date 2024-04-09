@@ -1,6 +1,7 @@
 ﻿using Discord.Interactions;
 using Discord;
 using Discord.WebSocket;
+using Discord.Rest;
 
 namespace Hartsy.Core
 {
@@ -10,15 +11,12 @@ namespace Hartsy.Core
 
         /// <summary>Initiates adding a new template, accessible only by users with the "HARTSY Staff" role. Displays a modal for entering template details.</summary>
         [SlashCommand("add-template", "Add a new template")]
+        [RequireRole("HARTSY Staff")]
         public async Task AddTemplateCommand()
         {
-            // Check if the user has the "HARTSY Staff" role
-            var user = Context.User as SocketGuildUser;
-            var hasHartsyStaffRole = user.Roles.Any(role => role.Name.Equals("HARTSY Staff", StringComparison.OrdinalIgnoreCase));
-
-            if (!hasHartsyStaffRole)
+            if (Context.User is not SocketGuildUser user)
             {
-                await RespondAsync("Only admins can perform this command. Report this with information on how you are even able to see this command!", ephemeral: true);
+                await RespondAsync("User not found.", ephemeral: true);
                 return;
             }
             try
@@ -47,9 +45,9 @@ namespace Hartsy.Core
         public async Task OnTemplateModalSubmit(AddTemplateModal addTemplateModal)
         {
             // Extract the values from the modal
-            string name = addTemplateModal.Name;
-            string description = addTemplateModal.Description;
-            string positive = addTemplateModal.Positive;
+            string name = addTemplateModal.Name ?? "Template Name";
+            string description = addTemplateModal.Description ?? "Template description";
+            string positive = addTemplateModal.Positive ?? "Positive prompt";
 
             SupabaseClient.Template newTemplate = new()
             {
@@ -79,15 +77,15 @@ namespace Hartsy.Core
 
             [InputLabel("Name")]
             [ModalTextInput("name", placeholder: "Template name")]
-            public string Name { get; set; }
+            public string? Name { get; set; }
 
             [InputLabel("Description")]
             [ModalTextInput("description", TextInputStyle.Paragraph, placeholder: "Template description")]
-            public string Description { get; set; }
+            public string? Description { get; set; }
 
             [InputLabel("Positive Prompt")]
             [ModalTextInput("positive", TextInputStyle.Paragraph, placeholder: "Positive prompt")]
-            public string Positive { get; set; }
+            public string? Positive { get; set; }
 
             // Constructors, if needed
             public AddTemplateModal() { }
@@ -101,25 +99,13 @@ namespace Hartsy.Core
 
         /// <summary>Initiates the setup or updating of server rules, accessible only by users with the "HARTSY Staff" role. Displays a modal to enter or update the server rules.</summary>
         [SlashCommand("setup_rules", "Set up rules for the server.")]
+        [RequireRole("HARTSY Staff")]
         public async Task SetupRulesCommand()
         {
-            // Check if the user has the "HARTSY Staff" role
-            var user = Context.User as SocketGuildUser;
-            var hasHartsyStaffRole = user.Roles.Any(role => role.Name.Equals("HARTSY Staff", StringComparison.OrdinalIgnoreCase));
-
-            if (!hasHartsyStaffRole)
-            {
-                await RespondAsync("Only admins can perform this command. Report this with information on how you are even able to see this command!", ephemeral: true);
-                return;
-            }
             try
             {
-                var rulesChannel = Context.Guild.TextChannels.FirstOrDefault(x => x.Name == "rules");
-                if (rulesChannel == null)
-                {
-                    await RespondAsync("Rules channel not found.");
-                    return;
-                }
+                ITextChannel? rulesChannel = Context.Guild.TextChannels.FirstOrDefault(x => x.Name == "rules");
+                rulesChannel ??= await Context.Guild.CreateTextChannelAsync("rules");
 
                 // Initialize default text
                 string defaultDescription = "Default description text",
@@ -180,7 +166,7 @@ namespace Hartsy.Core
                     .AddField("Code of Conduct", modal.CodeOfConduct, true)
                     .AddField("Our Story", modal.OurStory, true)
                     .AddField("What Does This Button Do?", modal.ButtonFunction, true)
-                    .WithColor(Discord.Color.Blue)
+                    .WithColor(Color.Blue)
                     .WithCurrentTimestamp()
                     .WithImageUrl("attachment://server_rules.png")
                     .WithFooter("Click the buttons to add roles")

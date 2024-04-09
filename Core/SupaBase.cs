@@ -10,12 +10,9 @@ namespace Hartsy.Core
 {
     public class SupabaseClient
     {
-        public Client supabase;
+        public Client? supabase;
 
-        public SupabaseClient()
-        {
-            InitializeSupabase().GetAwaiter().GetResult();
-        }
+        public SupabaseClient() => InitializeSupabase().GetAwaiter().GetResult();
 
         /// <summary>Initializes the Supabase client with the provided URL and key.</summary>
         /// <returns>A task representing the asynchronous operation of initializing the Supabase client.</returns>
@@ -40,7 +37,7 @@ namespace Hartsy.Core
             {
                 AutoConnectRealtime = true
             };
-            supabase = new Client(url, key, options);
+            supabase = new Client(url!, key, options);
             await supabase.InitializeAsync();
         }
 
@@ -52,7 +49,7 @@ namespace Hartsy.Core
             try
             {
                 // Check if any user has the provided Discord ID
-                var result = await supabase
+                var result = await supabase!
                     .From<Users>()
                     .Select("*") // Selects all fields; replace '*' with specific fields as needed
                     .Filter("provider_id", Operator.Equals, discordId)
@@ -77,7 +74,7 @@ namespace Hartsy.Core
         {
             try
             {
-                var response = await supabase
+                var response = await supabase!
                     .From<Users>()
                     .Select("*")
                     .Filter("provider_id", Operator.Equals, discordId)
@@ -138,7 +135,7 @@ namespace Hartsy.Core
                 Console.WriteLine("\nAttempting to fetch subscription for user ID: " + userId + "\n");
 
                 // Query to get subscription data for a specific user ID
-                var response = await supabase.From<Users>()
+                var response = await supabase!.From<Users>()
                 .Select("*")
                 .Filter("id", Operator.Equals, userId)
                 .Single();
@@ -166,14 +163,14 @@ namespace Hartsy.Core
         {
             try
             {
-                var response = await supabase.From<Template>().Select("*").Get();
+                var response = await supabase!.From<Template>().Select("*").Get();
 
                 // Ensure we have models to work with
                 if (response.Models != null && response.Models.Count != 0)
                 {
                     // Convert the list of templates to a dictionary
                     var templatesDictionary = response.Models.ToDictionary(template => template.Name, template => template);
-                    return templatesDictionary;
+                    return templatesDictionary!;
                 }
                 else
                 {
@@ -201,7 +198,7 @@ namespace Hartsy.Core
                 {
                     Console.WriteLine("User not found.");
                 }
-                var userId = user.Id;
+                var userId = user!.Id;
                 var newGeneration = new Generations
                 {
                     UserId = userId,
@@ -219,11 +216,11 @@ namespace Hartsy.Core
                     Status = "saved"
                 };
 
-                var response = await supabase.From<Generations>().Insert(newGeneration);
+                var response = await supabase!.From<Generations>().Insert(newGeneration);
 
                 if (response == null)
                 {
-                    Console.WriteLine($"Error inserting new generation: {response.ResponseMessage}");
+                    Console.WriteLine($"Error inserting new generation: {response!.ResponseMessage}");
                 }
                 else
                 {
@@ -250,7 +247,7 @@ namespace Hartsy.Core
                 }
                 var newImage = new Images
                 {
-                    UserId = Guid.Parse(userId),
+                    UserId = Guid.Parse(userId!),
                     GenerationId = 815,
                     ImageUrl = imageUrl,
                     CreatedAt = DateTime.UtcNow,
@@ -258,11 +255,11 @@ namespace Hartsy.Core
                     IsPublic = false
                 };
 
-                var response = await supabase.From<Images>().Insert(newImage);
+                var response = await supabase!.From<Images>().Insert(newImage);
 
                 if (response == null)
                 {
-                    Console.WriteLine($"Error inserting new image: {response.ResponseMessage}");
+                    Console.WriteLine($"Error inserting new image: {response!.ResponseMessage}");
                 }
                 else
                 {
@@ -283,11 +280,11 @@ namespace Hartsy.Core
             try
             {
 
-                var response = await supabase.From<Template>().Insert(newTemplate);
+                var response = await supabase!.From<Template>().Insert(newTemplate);
 
                 if (response == null)
                 {
-                    Console.WriteLine($"Error inserting new template: {response.ResponseMessage}");
+                    Console.WriteLine($"Error inserting new template: {response!.ResponseMessage}");
                 }
                 else
                 {
@@ -308,12 +305,12 @@ namespace Hartsy.Core
         {
             try
             {
-                var response = await supabase.From<Users>()
+                var response = await supabase!.From<Users>()
                                              .Where(x => x.ProviderId == userId)
-                                             .Set(x => x.Credit, newCredit)
+                                             .Set(x => x.Credit!, newCredit)
                                              .Update();
                 // Check the result of the operation
-                if (response.ResponseMessage.IsSuccessStatusCode)
+                if (response.ResponseMessage!.IsSuccessStatusCode)
                 {
                     return true;
                 }
@@ -338,7 +335,7 @@ namespace Hartsy.Core
         {
             try
             {
-                var storage = supabase.Storage;
+                var storage = supabase!.Storage;
                 string fileName = Path.GetFileName(imagePath);
                 string storagePath = $"{userId}/{fileName}";
 
@@ -361,7 +358,7 @@ namespace Hartsy.Core
             catch (Exception ex)
             {
                 Console.WriteLine($"Error uploading image: {ex.Message}");
-                return null;
+                return null!;
             }
         }
 
@@ -523,7 +520,7 @@ namespace Hartsy.Core
             public bool? Active { get; set; }
 
             [Column("name")]
-            public string? Name { get; set; }
+            public string Name { get; set; } = string.Empty;
 
             [Column("description")]
             public string? Description { get; set; }
@@ -596,7 +593,7 @@ namespace Hartsy.Core
             public long GenerationId { get; set; }
 
             [Column("image_url")]
-            public string ImageUrl { get; set; }
+            public string? ImageUrl { get; set; }
 
             [Column("created_at")]
             public DateTime CreatedAt { get; set; }

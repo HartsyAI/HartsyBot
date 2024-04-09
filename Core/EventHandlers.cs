@@ -53,13 +53,13 @@ namespace Hartsy.Core
                     .WithTitle("Welcome to Hartsy.AI!")
                     .WithDescription($"{user.Mention}, we're thrilled to have you join the **Hartsy.AI** Discord Server!")
                     .AddField("Getting Started", $"Please check out the <#{rulesChannel.Id}> for our community guidelines and the " +
-                    $"<#{infoChannel.Id}> for information on how to get the most out of our server.")
+                    $"<#{infoChannel?.Id}> for information on how to get the most out of our server.")
                     .AddField("Using the Bot", $"You can use our custom bot in the <#{generateChannel.Id}> channel to generate images. " +
                     $"Each image generation will consume one GPUT from your account.")
                     .AddField("About GPUTs", "GPUTs (GPU Time) are used as tokens for generating images. " +
                     "If you need more, you can purchase additional GPUTs on our website. You can make a 1 time purchase or choose a subscription")
                     .WithFooter("Enjoy your stay and unleash your creativity with Hartsy.AI!")
-                    .WithColor(Discord.Color.Blue)
+                    .WithColor(Color.Blue)
                     .WithThumbnailUrl(user.GetAvatarUrl() ?? user.GetDefaultAvatarUrl())
                     .WithCurrentTimestamp()
                     .Build();

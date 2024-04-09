@@ -2,6 +2,7 @@
 using Discord.WebSocket;
 using Discord;
 using SixLabors.ImageSharp;
+using Supabase.Gotrue;
 
 namespace Hartsy.Core
 {
@@ -53,9 +54,9 @@ namespace Hartsy.Core
         {
             try
             {
-                var user = targetUser ?? (Context.User as SocketGuildUser);
-                var contextUser = Context.User as SocketGuildUser;
-                if (targetUser != null && contextUser.Roles.Any(x => x.Name == "HARTSY Staff "))
+                IUser? user = targetUser ?? (Context.User as SocketGuildUser);
+                SocketGuildUser? contextUser = Context.User as SocketGuildUser;
+                if (targetUser != null && contextUser?.Roles.Any(x => x.Name == "HARTSY Staff ") == true)
                 {
                     var embed = new EmbedBuilder()
                         .WithTitle("Restricted Action")
@@ -66,7 +67,7 @@ namespace Hartsy.Core
                                          "Please log into Hartsy.AI using your Discord account to link it.")
                         .WithColor(Discord.Color.Red)
                         .WithThumbnailUrl(Context.Client.CurrentUser.GetAvatarUrl() ?? Context.Client.CurrentUser.GetDefaultAvatarUrl())
-                        .WithFooter("This action was attempted by " + user.Username)
+                        .WithFooter("This action was attempted by " + user?.Username)
                         .WithTimestamp(DateTimeOffset.Now)
                         .Build();
 
@@ -74,14 +75,14 @@ namespace Hartsy.Core
                     return;
                 }
 
-                var userInfo = await _supabaseClient.GetUserByDiscordId(user.Id.ToString());
+                var userInfo = await _supabaseClient.GetUserByDiscordId(user?.Id.ToString() ?? "");
                 var subscriptionInfo = userInfo != null ? await _supabaseClient.GetSubscriptionByUserId(userInfo.Id ?? "0") : null;
 
                 if (userInfo != null)
                 {
                     var embed = new EmbedBuilder()
                         .WithTitle($"{userInfo.Username}'s Information")
-                        .WithThumbnailUrl(userInfo.Avatar_URL ?? user.GetAvatarUrl() ?? user.GetDefaultAvatarUrl())
+                        .WithThumbnailUrl(userInfo.Avatar_URL ?? user?.GetAvatarUrl() ?? user?.GetDefaultAvatarUrl())
                         .AddField("Full Name", userInfo.Name ?? "N/A", true)
                         .AddField("Email", userInfo.Email ?? "N/A", true)
                         .AddField("Credit Limit", userInfo.Credit?.ToString() ?? "N/A", true)
@@ -125,7 +126,7 @@ namespace Hartsy.Core
             [Summary("text", "The text you want to appear in the image.")] string text,
             [Summary("template", "Choose a template for the image.")]
             [Autocomplete(typeof(TemplateAutocompleteHandler))] string template,
-            [Summary("additional_details", "Describe other aspects to add to the prompt.")] string description = null)
+            [Summary("additional_details", "Describe other aspects to add to the prompt.")] string? description = null)
         {
             await DeferAsync(ephemeral: true);
             // if additional details is over 15 characters long, return an error message
@@ -146,8 +147,8 @@ namespace Hartsy.Core
                 await FollowupAsync(embed: embed, ephemeral: true);
                 return;
             }
-            var user = Context.User as SocketGuildUser;
-            var userInfo = await _supabaseClient.GetUserByDiscordId(user.Id.ToString());
+            SocketGuildUser user = (SocketGuildUser)Context.User;
+            var userInfo = await _supabaseClient.GetUserByDiscordId(user?.Id.ToString() ?? "");
             if (userInfo == null)
             {
                 await HandleSubscriptionFailure(Context);
@@ -159,7 +160,7 @@ namespace Hartsy.Core
             // Check if the user has a valid subscription and enough credits
             if (subStatus != null && userInfo.Credit > 0)
             {
-                await _supabaseClient.UpdateUserCredit(user.Id.ToString(), credits);
+                await _supabaseClient.UpdateUserCredit(user?.Id.ToString() ?? "", credits);
                 var embed = new EmbedBuilder()
                     .WithTitle("Image Generation")
                     .WithDescription($"You have {credits} GPUT. You will have {credits - 1} GPUT after this image is generated.")
@@ -174,8 +175,9 @@ namespace Hartsy.Core
                 // Add the role to the user if they do not have it
                 await AddSubRole(user, subStatus);
 
+                SocketTextChannel? channel = Context.Channel as SocketTextChannel;
                 // Proceed with image generation
-                await GenerateFromTemplate(text, template, Context.Channel as SocketTextChannel, user, description);
+                await GenerateFromTemplate(text, template, channel, user, description);
             }
             else
             {
@@ -188,10 +190,10 @@ namespace Hartsy.Core
         /// <summary>Adds a subscription role to the user based on their subscription status.</summary>
         /// <param name="user">The user to add the subscription role to.</param>
         /// <param name="subStatus">The subscription status of the user.</param>
-        public static async Task AddSubRole(SocketGuildUser user, string subStatus)
+        public static async Task AddSubRole(SocketGuildUser? user, string? subStatus)
         {
-            var subRole = user.Guild.Roles.FirstOrDefault(role => role.Name.Equals(subStatus, StringComparison.OrdinalIgnoreCase));
-            if (subRole != null && !user.Roles.Contains(subRole))
+            SocketRole? subRole = user?.Guild.Roles.FirstOrDefault(role => role.Name.Equals(subStatus, StringComparison.OrdinalIgnoreCase));
+            if (subRole != null && !user!.Roles.Contains(subRole))
             {
                 await user.AddRoleAsync(subRole);
             }
@@ -201,7 +203,7 @@ namespace Hartsy.Core
         /// <param name="context">The interaction context to respond to.</param>
         public static async Task HandleSubscriptionFailure(IInteractionContext context)
         {
-            var user = context.User;
+            IUser user = context.User;
             var embed = new EmbedBuilder()
                 .WithTitle("Access Denied")
                 .WithDescription($"{user.Mention} You either do not have a valid subscription, you have insufficient credits, or You have not properly linked your account. " +
@@ -231,8 +233,8 @@ namespace Hartsy.Core
         /// <param name="user">The user who initiated the image generation.</param>
         /// <param name="description">Additional description to refine the image generation.</param>
         /// <param name="initimage">Initial image for image-to-image generation, if applicable.</param>
-        public async Task GenerateFromTemplate(string text, string template, SocketTextChannel channel, 
-            SocketGuildUser user, string description = null, string initimage = null)
+        public async Task GenerateFromTemplate(string? text, string template, SocketTextChannel? channel, 
+            SocketGuildUser? user, string? description = null, string? initimage = null)
         {
             string prompt = string.Empty;
             string TemplateInfo = string.Empty;
@@ -241,13 +243,13 @@ namespace Hartsy.Core
             var templates = await _supabaseClient.GetTemplatesAsync();
             if (templates != null && templates.TryGetValue(template, out var templateDetails))
             {
-                string positiveText = templateDetails.Positive.Replace("__TEXT_REPLACE__", text);
+                string positiveText = templateDetails.Positive?.Replace("__TEXT_REPLACE__", text) ?? "";
                 prompt = $"{positiveText}, {description}";
-                TemplateInfo = templateDetails.Description;
-                imageUrl = templateDetails.ImageUrl;
+                TemplateInfo = templateDetails?.Description ?? "";
+                imageUrl = templateDetails?.ImageUrl ?? "";
             }
 
-            var username = user.Username;
+            string username = user!.Username;
 
             var embed = new EmbedBuilder()
                 .WithAuthor(user)
@@ -260,7 +262,7 @@ namespace Hartsy.Core
                 .WithCurrentTimestamp()
                 .Build();
 
-            var previewMsg = await channel.SendMessageAsync(embed: embed);
+            var previewMsg = await channel!.SendMessageAsync(embed: embed);
             var payload = new Dictionary<string, object>
                 {
                     {"prompt", prompt},
@@ -278,7 +280,7 @@ namespace Hartsy.Core
                     {"seed", -1},
                     {"sampler", "dpmpp_3m_sde"},
                     {"scheduler", "karras"},
-                    {"initimage", initimage},
+                    {"initimage", initimage!},
                     {"init_image_creativity", 0.7},
                 };
             ulong messageId = previewMsg.Id;
@@ -292,9 +294,9 @@ namespace Hartsy.Core
                 using var ms = new MemoryStream();
                 image.SaveAsJpeg(ms);
                 ms.Position = 0;
-                var file = new FileAttachment(ms, "image_grid.jpeg");
+                FileAttachment file = new(ms, "image_grid.jpeg");
 
-                var updatedEmbed = previewMsg.Embeds.FirstOrDefault()?.ToEmbedBuilder() ?? new EmbedBuilder();
+                EmbedBuilder updatedEmbed = previewMsg.Embeds.FirstOrDefault()?.ToEmbedBuilder() ?? new EmbedBuilder();
                 updatedEmbed.WithImageUrl($"attachment://image_grid.jpeg");
                 updatedEmbed.WithColor(Discord.Color.Red);
 

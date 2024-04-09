@@ -2,6 +2,7 @@
 using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
+using Supabase.Gotrue;
 
 namespace Hartsy.Core
 {
@@ -147,7 +148,7 @@ namespace Hartsy.Core
 
             var user = Context.User as SocketGuildUser;
 
-            var userInfo = await _supabaseClient.GetUserByDiscordId(user.Id.ToString());
+            var userInfo = await _supabaseClient.GetUserByDiscordId(user?.Id.ToString() ?? "");
             if (userInfo == null)
             {
                 Console.WriteLine("userInfo is null - User not found in database.");
@@ -163,7 +164,7 @@ namespace Hartsy.Core
                 return;
             }
             int credits = userInfo.Credit ?? 0;
-            await _supabaseClient.UpdateUserCredit(user.Id.ToString(), credits - 1);
+            await _supabaseClient.UpdateUserCredit(user?.Id.ToString() ?? "", credits - 1);
 
             var creditEmbed = new EmbedBuilder()
                     .WithTitle("Image Generation")
@@ -220,9 +221,10 @@ namespace Hartsy.Core
             }
 
             await DeferAsync();
+            SocketMessageComponent? interaction = Context.Interaction as SocketMessageComponent;
 
             // Delete the original message
-            await (Context.Interaction as SocketMessageComponent)?.Message.DeleteAsync();
+            await (interaction?.Message.DeleteAsync()!);
 
             // Respond with a followup message
             await FollowupAsync("Message deleted successfully", ephemeral: true);
@@ -251,7 +253,7 @@ namespace Hartsy.Core
 
             // Create a select menu for the user to choose an image to showcase
             var selectMenu = new SelectMenuBuilder()
-                .WithCustomId($"select_image:showcase:{Context.User.Id}:{originalMessage.Id}")
+                .WithCustomId($"select_image:showcase:{Context.User.Id}:{originalMessage?.Id}")
                 .WithPlaceholder("Select an image to add to the showcase channel")
                 .AddOption("Image 1", "image_0")
                 .AddOption("Image 2", "image_1")
@@ -290,8 +292,9 @@ namespace Hartsy.Core
                 await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
                 return;
             }
-            var channel = Context.Channel;
-            var messageId = (Context.Interaction as SocketMessageComponent).Message.Id;
+            ISocketMessageChannel channel = Context.Channel;
+            SocketMessageComponent? interaction = Context.Interaction as SocketMessageComponent;
+            ulong messageId = interaction!.Message.Id;
 
             switch (customId)
             {
@@ -315,10 +318,10 @@ namespace Hartsy.Core
         [ComponentInteraction("report:*")]
         public async Task ReportButtonHandler(string userId)
         {
-            var user = Context.User as SocketGuildUser;
+            SocketGuildUser? user = Context.User as SocketGuildUser;
             var guild = Context.Guild;
 
-            if (IsOnCooldown(user, "report"))
+            if (IsOnCooldown(user!, "report"))
             {
                 await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
                 return;
@@ -332,7 +335,7 @@ namespace Hartsy.Core
             {
                 var embed = new EmbedBuilder()
                     .WithTitle("Reported Message")
-                    .WithDescription($"A message has been reported by {user.Mention}. " +
+                    .WithDescription($"A message has been reported by {user!.Mention}. " +
                     $"\n\n<@{userId}> may have created an image that breaks the community rules. A mod needs to look at this ASAP!")
                     .AddField("Reported by", user.Mention, true)
                     .AddField("Message Link", $"[Jump to message]({message.GetJumpUrl()})", true)
@@ -347,7 +350,7 @@ namespace Hartsy.Core
                 var component = new ComponentBuilder()
                     .WithButton("Reported", "report", ButtonStyle.Danger, disabled: true)
                     .Build();
-                await (message as IUserMessage)?.ModifyAsync(msg => msg.Components = component);
+                await (message as IUserMessage)?.ModifyAsync(msg => msg.Components = component)!;
 
                 var response = new EmbedBuilder()
                     .WithTitle("Message Reported")
@@ -416,10 +419,10 @@ namespace Hartsy.Core
                     string[] splitCustomId = customId.Split(":");
                     ulong userId = ulong.Parse(splitCustomId[1]);
                     string type = splitCustomId[0].ToString();
-                    var interaction = Context.Interaction as SocketMessageComponent;
-                    string username = interaction.User.Username;
-                    ulong messageId = interaction.Message.Id;
-                    var selectMenu = new SelectMenuBuilder()
+                    SocketMessageComponent? interaction = Context.Interaction as SocketMessageComponent;
+                    string username = interaction!.User.Username;
+                    ulong messageId = interaction!.Message.Id;
+                    SelectMenuBuilder selectMenu = new SelectMenuBuilder()
                             .WithPlaceholder("Select an image")
                             .AddOption("Image 1", "image_0")
                             .AddOption("Image 2", "image_1")
@@ -469,7 +472,9 @@ namespace Hartsy.Core
         /// <param name="selections">The selections made by the user in the select menu.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
         [ComponentInteraction("select_image:*")]
+#pragma warning disable IDE0051 // Remove unused private members
         private async Task HandleImageSelect(string customId, string[] selections)
+#pragma warning restore IDE0051 // Remove unused private members
         {
             await DeferAsync();
             var selectedValue = selections.FirstOrDefault();
@@ -479,17 +484,17 @@ namespace Hartsy.Core
                 string[] parts = customId.Split(':');
                 if (parts.Length >= 4) return;
 
-                var actionType = parts[0]; // Should give "i2i" or "add"
-                var userid = parts[1]; // Should give the userId part
-                var messageId = parts[2]; // Should give the messageId part
+                string actionType = parts[0]; // Should give "i2i" or "add"
+                string userid = parts[1]; // Should give the userId part
+                string messageId = parts[2]; // Should give the messageId part
 
-                var interaction = Context.Interaction as SocketMessageComponent;
-                var username = interaction.User.Username;
+                SocketMessageComponent? interaction = Context.Interaction as SocketMessageComponent;
+                string username = interaction!.User.Username;
                 string userId = interaction.User.Id.ToString();
 
                 if (userId != userid)
                 {
-                    var errorEmbed = new EmbedBuilder()
+                    EmbedBuilder errorEmbed = new EmbedBuilder()
                         .WithTitle("Selection Error")
                         .WithDescription("Error: You cannot select another user's image.")
                         .WithColor(Color.Red)
@@ -499,23 +504,23 @@ namespace Hartsy.Core
                     return;
                 }
 
-                var filePath = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), $"../../../images/{username}/{messageId}/{messageId}:{selectedValue}.jpeg"));
+                string filePath = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), $"../../../images/{username}/{messageId}/{messageId}:{selectedValue}.jpeg"));
                 // add the base 64 of the image to send to generatefromtemplate
-                var initimage = Convert.ToBase64String(File.ReadAllBytes(filePath));
+                string initimage = Convert.ToBase64String(File.ReadAllBytes(filePath));
 
                 if (File.Exists(filePath))
                 {
                     if (actionType == "i2i")
                     {
-                        var message = await Context.Channel.GetMessageAsync(Convert.ToUInt64(messageId)) as IUserMessage;
-                        var embed = message.Embeds.First();
+                        IUserMessage? message = await Context.Channel.GetMessageAsync(Convert.ToUInt64(messageId)) as IUserMessage;
+                        IEmbed embed = message!.Embeds.First();
                         var (text, description, template) = ParseEmbed(embed);
-                        var channel = Context.Channel as SocketTextChannel;
+                        SocketTextChannel? channel = Context.Channel as SocketTextChannel;
 
-                        var user = Context.User as SocketGuildUser;
+                        SocketGuildUser? user = Context.User as SocketGuildUser;
 
-                        var userInfo = await _supabaseClient.GetUserByDiscordId(user.Id.ToString());
-                        var subStatus = userInfo.PlanName;
+                        SupabaseClient.Users? userInfo = await _supabaseClient.GetUserByDiscordId(user!.Id.ToString());
+                        var subStatus = userInfo!.PlanName;
                         if (subStatus == null || userInfo.Credit <= 0)
                         {
                             Console.WriteLine($"Subscription status or credit issue. Status: {subStatus}, Credits: {userInfo.Credit}");
@@ -540,12 +545,12 @@ namespace Hartsy.Core
                     else if (actionType == "add")
                     {
                         // TODO: Check if the user has room in the gallery to add the image
-                        var supaUser = await _supabaseClient.GetUserByDiscordId(userId);
-                        var supaUserId = supaUser.Id;
-                        var url = await _supabaseClient.UploadImage(supaUserId, filePath);
+                        SupabaseClient.Users? supaUser = await _supabaseClient.GetUserByDiscordId(userId);
+                        string? supaUserId = supaUser?.Id;
+                        string url = await _supabaseClient.UploadImage(supaUserId!, filePath);
                         if (url != null)
                         {
-                            _supabaseClient.AddImage(supaUserId, url);
+                            await _supabaseClient.AddImage(supaUserId!, url);
                             // Create an embed builder instance
                             var embed = new EmbedBuilder()
                                 .WithTitle("Image Saved Successfully")

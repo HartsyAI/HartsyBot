@@ -13,12 +13,9 @@ namespace HartsyBot
         private DiscordSocketClient? _client;
         private InteractionService? _interactions;
         private IServiceProvider? _serviceProvider;
-        private readonly IServiceCollection? _services;
-
-        public object? Context { get; private set; }
 
         /// <summary>Main entry point for the bot application.</summary>
-        static void Main(string[] args) => new Program().MainAsync().GetAwaiter().GetResult();
+        static void Main() => new Program().MainAsync().GetAwaiter().GetResult();
 
         /// <summary>Starts the main execution of the bot program asynchronously. Initializes the client, services, and event handlers.</summary>
         /// <returns>A Task representing the asynchronous operation.</returns>
@@ -47,7 +44,7 @@ namespace HartsyBot
 
             _client.InteractionCreated += async interaction =>
             {
-                var ctx = new SocketInteractionContext(_client, interaction);
+                SocketInteractionContext ctx = new(_client, interaction);
                 await _interactions.ExecuteCommandAsync(ctx, _serviceProvider);
             };
 
@@ -56,8 +53,8 @@ namespace HartsyBot
             _client.Ready += () => ReadyAsync();
 
             // Initialize and register event handlers
-            var supabaseClient = _serviceProvider.GetRequiredService<SupabaseClient>();
-            var eventHandlers = new EventHandlers(_client, supabaseClient);
+            SupabaseClient supabaseClient = _serviceProvider.GetRequiredService<SupabaseClient>();
+            EventHandlers eventHandlers = new(_client, supabaseClient);
             eventHandlers.RegisterHandlers();
 
             if (string.IsNullOrEmpty(token))
@@ -93,19 +90,19 @@ namespace HartsyBot
                 .BuildServiceProvider();
         }
 
-        /// <summary>Executes tasks when the bot client is ready, such as command registration and initialization. It registers commands to guilds and sets the bot status.</summary>
-        /// <param name="services">The service provider containing registered services.</param>
+        /// <summary>Executes tasks when the bot client is ready, such as command registration and initialization. 
+        /// It registers commands to guilds and sets the bot status.</summary>
         /// <returns>A Task representing the asynchronous operation.</returns>
         private async Task ReadyAsync()
         {
             try
             {
                 // Things to be run when the bot is ready
-                if (_client.Guilds.Count != 0)
+                if (_client!.Guilds.Count != 0)
                 {
                     // Register command modules with the InteractionService.
                     // Tells  to scan the whole assembly for classes that define slash commands.
-                    await _interactions.AddModulesAsync(Assembly.GetEntryAssembly(), _serviceProvider);
+                    await _interactions!.AddModulesAsync(Assembly.GetEntryAssembly(), _serviceProvider);
 
                     foreach (var guild in _client.Guilds)
                     {
@@ -118,7 +115,7 @@ namespace HartsyBot
                 }
 
                 Console.WriteLine($"\nLogged in as {_client.CurrentUser.Username}\n" +
-                    $"Registered {_interactions.SlashCommands.Count} slash commands\n" +
+                    $"Registered {_interactions!.SlashCommands.Count} slash commands\n" +
                     $"Bot is a member of {_client.Guilds.Count} guilds\n");
                 await _client.SetGameAsync("/help", null, ActivityType.Listening);
             }
