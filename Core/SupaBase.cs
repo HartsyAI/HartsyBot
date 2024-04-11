@@ -490,7 +490,7 @@ namespace Hartsy.Core
             public int? Amount { get; set; }
         }
 
-        /// <summary>Represents a template record, mapping to the 'templates' table in Supabase.</summary>
+        // Represents a template record, mapping to the 'templates' table in Supabase.
         [Table("templates")]
         public class Template : BaseModel
         {
@@ -513,7 +513,7 @@ namespace Hartsy.Core
             public long? Seed { get; set; }
 
             [Column("created_at")]
-            public string? CreatedAt { get; set; }
+            public DateTimeOffset? CreatedAt { get; set; }
 
             [Column("order_rank")]
             public long? OrderRank { get; set; }
@@ -531,7 +531,22 @@ namespace Hartsy.Core
             public string? ImageUrl { get; set; }
 
             [Column("user_id")]
-            public string? UserId { get; set; }
+            public Guid? UserId { get; set; }
+
+            [Column("cfg")]
+            public float? Cfg { get; set; }
+
+            [Column("steps")]
+            public int? Steps { get; set; }
+
+            [Column("sampler")]
+            public string? Sampler { get; set; }
+
+            [Column("scheduler")]
+            public string? Scheduler { get; set; }
+
+            [Column("loras")]
+            public string? Loras { get; set; }
         }
 
         /// <summary>Represents a price record, mapping to the 'prices' table in Supabase.</summary>

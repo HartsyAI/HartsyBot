@@ -230,57 +230,6 @@ namespace Hartsy.Core
             await FollowupAsync("Message deleted successfully", ephemeral: true);
         }
 
-        /// <summary>Handles the interaction when the 'showcase' button is clicked, preparing a selection menu for showcasing an image.</summary>
-        /// <param name="customId">The custom ID associated with the button that triggered the interaction.</param>
-        /// <returns>A task representing the asynchronous operation.</returns>
-        [ComponentInteraction("showcase:*")]
-        public async Task ShowcaseButtonHandler(string customId)
-        {
-            if (IsOnCooldown(Context.User, "showcase"))
-            {
-                await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
-                return;
-            }
-
-            if (Context.User.Id.ToString() != customId)
-            {
-                Console.WriteLine("Another user tried to click a button");
-                await RespondAsync("Error: You cannot showcase another user's image.", ephemeral: true);
-                return;
-            }
-            await DeferAsync(); // Defer the response
-            var originalMessage = (Context.Interaction as SocketMessageComponent)?.Message as IUserMessage;
-
-            // Create a select menu for the user to choose an image to showcase
-            var selectMenu = new SelectMenuBuilder()
-                .WithCustomId($"select_image:showcase:{Context.User.Id}:{originalMessage?.Id}")
-                .WithPlaceholder("Select an image to add to the showcase channel")
-                .AddOption("Image 1", "image_0")
-                .AddOption("Image 2", "image_1")
-                .AddOption("Image 3", "image_2")
-                .AddOption("Image 4", "image_3");
-
-            var selectBuilder = new ComponentBuilder()
-                .WithSelectMenu(selectMenu);
-
-            var showcaseEmbed = new EmbedBuilder()
-                .WithTitle("Select Image for Showcase")
-                .WithDescription("Select an image to add to the #showcase channel. Other users will be able to vote on your image.")
-                .WithColor(Color.Blue)
-                .WithCurrentTimestamp();
-
-            await FollowupAsync(embed: showcaseEmbed.Build(), components: selectBuilder.Build(), ephemeral: true);
-
-            // TODO: Fix it so showcase button is disabled after image is showcased
-
-            // Update the original message with the modified components
-            //await originalMessage.ModifyAsync(msg => msg.Components = componentBuilder.Build());
-
-            //Console.WriteLine("Calling ShowcaseImageAsync.");
-            //await _showcase.ShowcaseImageAsync(Context.Guild, embed.Image.Value.Url, Context.User);
-            //await FollowupAsync("Image added to the showcase!", ephemeral: true);
-        }
-
         /// <summary>Handles the interaction when a vote button is clicked, updating the vote count for an image.</summary>
         /// <param name="customId">The custom ID associated with the button that triggered the interaction.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
@@ -459,6 +408,36 @@ namespace Hartsy.Core
 
                         return;
                     }
+                    else if (type == "gif")
+                    {
+                        selectMenu.WithCustomId($"select_image:create_gif:{userId}");
+                        var selectBuilder = new ComponentBuilder()
+                            .WithSelectMenu(selectMenu);
+                        var gifEmbed = new EmbedBuilder()
+                            .WithTitle("Select Images")
+                            .WithDescription("Select the images you wish to create a GIF from")
+                            .WithColor(Color.Green)
+                            .WithCurrentTimestamp();
+
+                        await RespondAsync(embed: gifEmbed.Build(), components: selectBuilder.Build(), ephemeral: true);
+
+                        return;
+                    }
+                    else if (type == "showcase")
+                    {
+                        selectMenu.WithCustomId($"select_image:showcase:{userId}:{messageId}");
+                        var selectBuilder = new ComponentBuilder()
+                            .WithSelectMenu(selectMenu);
+                        var showcaseEmbed = new EmbedBuilder()
+                            .WithTitle("Select Image for Showcase")
+                            .WithDescription("Select an image to add to the #showcase channel. Other users will be able to vote on your image.")
+                            .WithColor(Color.Blue)
+                            .WithCurrentTimestamp();
+
+                        await RespondAsync(embed: showcaseEmbed.Build(), components: selectBuilder.Build(), ephemeral: true);
+
+                        return;
+                    }
                 }
                 catch
                 {
@@ -508,6 +487,26 @@ namespace Hartsy.Core
                 // add the base 64 of the image to send to generatefromtemplate
                 string initimage = Convert.ToBase64String(File.ReadAllBytes(filePath));
 
+                SocketTextChannel? channel = Context.Channel as SocketTextChannel;
+                SocketGuildUser? user = Context.User as SocketGuildUser;
+                SupabaseClient.Users? supaUser = await _supabaseClient.GetUserByDiscordId(user!.Id.ToString());
+                var subStatus = supaUser!.PlanName;
+                if (subStatus == null || supaUser.Credit <= 0)
+                {
+                    Console.WriteLine($"Subscription status or credit issue. Status: {subStatus}, Credits: {supaUser.Credit}");
+                    await Commands.HandleSubscriptionFailure(Context);
+                    return;
+                }
+                int credits = supaUser.Credit ?? 0;
+                var creditEmbed = new EmbedBuilder()
+                                .WithTitle("Image Generation")
+                                .WithDescription($"You have {credits} GPUT. You will have {credits - 1} GPUT after this image is generated.")
+                                .AddField("Generate Command", "This command allows you to generate images based on the text and template you provide. " +
+                                "Each generation will use one GPUT from your account.\n\nGo to [Hartsy.ai](https://hartsy.ai) to check sub status or add GPUTs")
+                                .WithColor(Color.Gold)
+                                .WithCurrentTimestamp()
+                                .Build();
+
                 if (File.Exists(filePath))
                 {
                     if (actionType == "i2i")
@@ -515,43 +514,19 @@ namespace Hartsy.Core
                         IUserMessage? message = await Context.Channel.GetMessageAsync(Convert.ToUInt64(messageId)) as IUserMessage;
                         IEmbed embed = message!.Embeds.First();
                         var (text, description, template) = ParseEmbed(embed);
-                        SocketTextChannel? channel = Context.Channel as SocketTextChannel;
-
-                        SocketGuildUser? user = Context.User as SocketGuildUser;
-
-                        SupabaseClient.Users? userInfo = await _supabaseClient.GetUserByDiscordId(user!.Id.ToString());
-                        var subStatus = userInfo!.PlanName;
-                        if (subStatus == null || userInfo.Credit <= 0)
-                        {
-                            Console.WriteLine($"Subscription status or credit issue. Status: {subStatus}, Credits: {userInfo.Credit}");
-                            await Commands.HandleSubscriptionFailure(Context);
-                            return;
-                        }
-                        int credits = userInfo.Credit ?? 0;
-                        await _supabaseClient.UpdateUserCredit(user.Id.ToString(), credits - 1);
-
-                        var creditEmbed = new EmbedBuilder()
-                                .WithTitle("Image Generation")
-                                .WithDescription($"You have {credits} GPUT. You will have {credits - 1} GPUT after this image is generated.")
-                                .AddField("Generate Command", "This command allows you to generate images based on the text and template you provide. " +
-                                "Each generation will use one GPUT from your account.")
-                                .WithColor(Discord.Color.Gold)
-                                .WithCurrentTimestamp()
-                                .Build();
 
                         await FollowupAsync(embed: creditEmbed, ephemeral: true);
                         await _commands.GenerateFromTemplate(text, template, channel, user, description, initimage);
+                        await _supabaseClient.UpdateUserCredit(user.Id.ToString(), credits - 1);
                     }
                     else if (actionType == "add")
                     {
                         // TODO: Check if the user has room in the gallery to add the image
-                        SupabaseClient.Users? supaUser = await _supabaseClient.GetUserByDiscordId(userId);
                         string? supaUserId = supaUser?.Id;
                         string url = await _supabaseClient.UploadImage(supaUserId!, filePath);
                         if (url != null)
                         {
                             await _supabaseClient.AddImage(supaUserId!, url);
-                            // Create an embed builder instance
                             var embed = new EmbedBuilder()
                                 .WithTitle("Image Saved Successfully")
                                 .WithDescription("Your image has been added to your gallery. You can go to [Hartsy.ai](https://hartsy.ai) to view and download.")
@@ -569,6 +544,11 @@ namespace Hartsy.Core
                     {
                         await Showcase.ShowcaseImageAsync(Context.Guild, filePath, Context.User);
                         await FollowupAsync("Image added to the showcase!", ephemeral: true);
+                    }
+                    else if (actionType == "gif")
+                    {
+                        // TODO: Add create GIF logic
+                        Console.WriteLine("Calling CreateGifAsync.");
                     }
                 }
                 else
