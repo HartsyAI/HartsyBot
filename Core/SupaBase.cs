@@ -344,6 +344,8 @@ namespace Hartsy.Core
                 {
                     using var memoryStream = new MemoryStream();
                     await stream.CopyToAsync(memoryStream);
+                    // rename the file to avoid issues with colons in the filename
+                    
                     fileContents = memoryStream.ToArray();
                 }
 

@@ -399,7 +399,7 @@ namespace Hartsy.Core
                         .WithDescription($"{user.Mention}, you have not linked your Discord account with your Hartsy.AI account. Make a FREE account " +
                                                             "and log into Hartsy.AI using your Discord credentials. If you have already done that and are still having issues" +
                                                                                                 " contact an admin. This may be a bug.")
-                        .WithColor(Discord.Color.Blue)
+                        .WithColor(Color.Blue)
                         .WithTimestamp(DateTimeOffset.Now)
                         .Build();
 
