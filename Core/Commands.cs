@@ -2,7 +2,9 @@
 using Discord.WebSocket;
 using Discord;
 using SixLabors.ImageSharp;
+using System.Text.Json;
 using Supabase.Gotrue;
+using Supabase.Interfaces;
 
 namespace Hartsy.Core
 {
@@ -130,13 +132,13 @@ namespace Hartsy.Core
         {
             await DeferAsync(ephemeral: true);
             // if additional details is over 15 characters long, return an error message
-            if ((description != null && description.Length > 80) || text.Length > 25)
+            if ((description != null && description.Length > 120) || text.Length > 25)
             {
                 var embed = new EmbedBuilder()
                     .WithTitle("Input Length Error")
                     .WithDescription("Your input text or description exceeds the allowed character limit. Please adhere to the following constraints:" +
                                      "\n- Text must be 25 characters or less." +
-                                     "\n- Description must be 80 characters or less." +
+                                     "\n- Description must be 120 characters or less." +
                                      "\n\nAttempting to bypass or manipulate the system by tricking or 'jailbreaking' the AI is strictly prohibited " +
                                      "and against the community guidelines. Violations may result in actions taken against your account.")
                     .WithColor(Discord.Color.Red)
@@ -228,61 +230,82 @@ namespace Hartsy.Core
 
         /// <summary>Generates an image from a given text and template, and posts it in the specified channel.</summary>
         /// <param name="text">The text to generate the image from.</param>
-        /// <param name="template">The template to use for generating the image.</param>
+        /// <param name="templateName">The template to use for generating the image.</param>
         /// <param name="channel">The channel to post the generated image in.</param>
         /// <param name="user">The user who initiated the image generation.</param>
         /// <param name="description">Additional description to refine the image generation.</param>
         /// <param name="initimage">Initial image for image-to-image generation, if applicable.</param>
-        public async Task GenerateFromTemplate(string? text, string template, SocketTextChannel? channel, 
+
+        public async Task GenerateFromTemplate(string? text, string templateName, SocketTextChannel? channel,
             SocketGuildUser? user, string? description = null, string? initimage = null)
         {
             string prompt = string.Empty;
             string TemplateInfo = string.Empty;
             string imageUrl = string.Empty;
+            string username = user!.Username;
+            Embed? embed = null;
+            Dictionary<string, object>? payload = null;
 
             var templates = await _supabaseClient.GetTemplatesAsync();
-            if (templates != null && templates.TryGetValue(template, out var templateDetails))
+            if (templates != null && templates.TryGetValue(templateName, out var templateDetails))
             {
                 string positiveText = templateDetails.Positive?.Replace("__TEXT_REPLACE__", text) ?? "";
                 prompt = $"{positiveText}, {description}";
                 TemplateInfo = templateDetails?.Description ?? "";
                 imageUrl = templateDetails?.ImageUrl ?? "";
-            }
 
-            string username = user!.Username;
+                embed = new EmbedBuilder()
+                    .WithAuthor(user)
+                    .WithTitle("Thank you for generating your image with Hartsy.AI")
+                    .WithDescription($"Generating an image described by **{username}**\n\n" +
+                                     $"**Template Used:** {templateName}\n\n`{TemplateInfo}`\n\n")
+                    .WithImageUrl("https://github.com/kalebbroo/Hartsy/blob/main/images/wait.gif?raw=true")
+                    .WithThumbnailUrl(imageUrl)
+                    .WithColor(Discord.Color.Red)
+                    .WithCurrentTimestamp()
+                    .Build();
 
-            var embed = new EmbedBuilder()
-                .WithAuthor(user)
-                .WithTitle("Thank you for generating your image with Hartsy.AI")
-                .WithDescription($"Generating an image described by **{username}**\n\n" +
-                                 $"**Template Used:** {template}\n\n`{TemplateInfo}`\n\n")
-                .WithImageUrl("https://github.com/kalebbroo/Hartsy/blob/main/images/wait.gif?raw=true")
-                .WithThumbnailUrl($"{imageUrl}")
-                .WithColor(Discord.Color.Red)
-                .WithCurrentTimestamp()
-                .Build();
+                // Deserialize the 'loras' JSON data into a list of dictionaries
+                var lorasData = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(templateDetails.Loras);
 
-            var previewMsg = await channel!.SendMessageAsync(embed: embed);
-            var payload = new Dictionary<string, object>
+                // Initialize variables to hold the comma-separated names and weights
+                string loraname = "";
+                string loraweight = "";
+
+                if (lorasData != null)
                 {
-                    {"prompt", prompt},
-                    {"negativeprompt", "malformed letters, repeating letters, double letters"},
-                    {"images", 1},
-                    {"batchsize", 4},
-                    {"donotsave", true},
-                    {"model", "starlightXLAnimated_v3.safetensors"},
-                    {"loras", "an0tha0ne.safetensors"},
-                    {"loraweights", 0.9},
-                    {"width", 1024},
-                    {"height", 768},
-                    {"cfgscale", 6.5},
-                    {"steps", 28},
-                    {"seed", -1},
-                    {"sampler", "dpmpp_3m_sde"},
-                    {"scheduler", "karras"},
-                    {"initimage", initimage!},
-                    {"init_image_creativity", 0.7},
-                };
+                    // Project 'name' and 'weight' into separate lists
+                    var loraNames = lorasData.Select(lora => lora["name"].ToString()).ToList();
+                    var loraWeights = lorasData.Select(lora => lora["weight"].ToString()).ToList();
+
+                    // Join the lists into comma-separated strings
+                    loraname = string.Join(", ", loraNames);
+                    loraweight = string.Join(", ", loraWeights);
+                }
+
+                // Construct the payload
+                payload = new Dictionary<string, object>
+                    {
+                        {"prompt", prompt},
+                        {"negativeprompt", templateDetails.Negative ?? ""},
+                        {"images", 1},
+                        {"batchsize", 4},
+                        {"donotsave", true},
+                        {"model", templateDetails.Checkpoint ?? ""},
+                        {"loras", loraname ?? "an0tha0ne.safetensors"},
+                        {"loraweights", 0.9}, // loraweight ?? 0.9
+                        {"width", 1024},
+                        {"height", 768},
+                        {"cfgscale", templateDetails.Cfg ?? 6.5},
+                        {"steps", templateDetails.Steps ?? 28},
+                        {"seed", templateDetails.Seed ?? -1},
+                        {"sampler", templateDetails.Sampler ?? "dpmpp_3m_sde_gpu"},
+                        {"scheduler", templateDetails.Scheduler ?? "karras"},
+                        {"initimage", initimage!},
+                        {"init_image_creativity", 0.7},
+                    };
+            }
+            var previewMsg = await channel!.SendMessageAsync(embed: embed);
             ulong messageId = previewMsg.Id;
 
             await foreach (var (image, isFinal) in _stableSwarmAPI.GetImages(payload, username, messageId))
@@ -303,7 +326,7 @@ namespace Hartsy.Core
                 if (isFinal)
                 {
                     updatedEmbed.WithDescription($"Generated an image for **{username}**\n\n**Text:** {text}\n\n**Extra Description:** {description}" +
-                        $"\n\n**Template Used:** {template}\n\n`{TemplateInfo}`\n\n**Click Save to Gallery button to see the fullsize image**");
+                        $"\n\n**Template Used:** {templateName}\n\n`{TemplateInfo}`\n\n**Click Save to Gallery button to see the fullsize image**");
                     updatedEmbed.WithFooter("Click Save to Gallery button to see the fullsize image");
                     updatedEmbed.WithColor(Discord.Color.Green);
 
@@ -334,7 +357,7 @@ namespace Hartsy.Core
         {
             string customId = $"regenerate:{userId}";
             string deleteCustomId = $"delete:{userId}";
-            string showcaseCustomId = $"showcase:{userId}";
+            string showcaseCustomId = $"choose_image:showcase:{userId}";
             string reportCustomId = $"report:{userId}";
             string i2iCustomId = $"choose_image:i2i:{userId}";
             string saveCustomId = $"choose_image:save:{userId}";
