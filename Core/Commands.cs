@@ -5,6 +5,7 @@ using SixLabors.ImageSharp;
 using System.Text.Json;
 using Supabase.Gotrue;
 using Supabase.Interfaces;
+using Newtonsoft.Json.Linq;
 
 namespace Hartsy.Core
 {
@@ -265,8 +266,8 @@ namespace Hartsy.Core
                     .WithCurrentTimestamp()
                     .Build();
 
-                // Deserialize the 'loras' JSON data into a list of dictionaries
-                var lorasData = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(templateDetails.Loras);
+                // Assuming `loras` is a JArray
+                JArray? lorasData = templateDetails!.Loras;
 
                 // Initialize variables to hold the comma-separated names and weights
                 string loraname = "";
@@ -275,8 +276,9 @@ namespace Hartsy.Core
                 if (lorasData != null)
                 {
                     // Project 'name' and 'weight' into separate lists
-                    var loraNames = lorasData.Select(lora => lora["name"].ToString()).ToList();
-                    var loraWeights = lorasData.Select(lora => lora["weight"].ToString()).ToList();
+                    var loraNames = lorasData.Select(lora => ((JObject)lora)["name"]!.ToString()).ToList();
+                    var loraWeights = lorasData.Select(lora => ((JObject)lora)["weight"]!.ToString()).ToList();
+
 
                     // Join the lists into comma-separated strings
                     loraname = string.Join(", ", loraNames);
@@ -308,7 +310,7 @@ namespace Hartsy.Core
             var previewMsg = await channel!.SendMessageAsync(embed: embed);
             ulong messageId = previewMsg.Id;
 
-            await foreach (var (image, isFinal) in _stableSwarmAPI.GetImages(payload, username, messageId))
+            await foreach (var (image, isFinal) in _stableSwarmAPI.GetImages(payload!, username, messageId))
             {
                 if (image == null)
                 {

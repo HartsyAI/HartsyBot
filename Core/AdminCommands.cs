@@ -2,6 +2,7 @@
 using Discord;
 using Discord.WebSocket;
 using Discord.Rest;
+using Newtonsoft.Json.Linq;
 
 namespace Hartsy.Core
 {
@@ -60,9 +61,10 @@ namespace Hartsy.Core
                 Seed = null,
                 OrderRank = 1,
                 ImageUrl = "https://yfixpvzkurnytlvefeos.supabase.co/storage/v1/object/public/assets/TemplateGens/Placeholder/Placeholder.jpg?t=2024-04-05T03%3A29%3A44.676Z",
-                CreatedAt = DateTime.UtcNow.ToString(),
+                CreatedAt = DateTime.UtcNow,
                 Active = true,
                 UserId = null,
+                Loras = []
             };
             // Save the new template to the database
             await _supabaseClient.AddTemplate(newTemplate);

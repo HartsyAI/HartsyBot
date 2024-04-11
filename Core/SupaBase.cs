@@ -5,6 +5,7 @@ using static Postgrest.Constants;
 using System.Text.Json.Serialization;
 using System.Text.Json;
 using dotenv.net;
+using Newtonsoft.Json.Linq;
 
 namespace Hartsy.Core
 {
@@ -181,6 +182,7 @@ namespace Hartsy.Core
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in GetTemplates: {ex.Message}");
+                Console.WriteLine($"StackTrace: {ex.StackTrace}");
                 return null;
             }
         }
@@ -546,7 +548,7 @@ namespace Hartsy.Core
             public string? Scheduler { get; set; }
 
             [Column("loras")]
-            public string? Loras { get; set; }
+            public JArray? Loras { get; set; }
         }
 
         /// <summary>Represents a price record, mapping to the 'prices' table in Supabase.</summary>
