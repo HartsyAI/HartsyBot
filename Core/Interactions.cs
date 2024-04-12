@@ -2,14 +2,14 @@
 using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
-using Supabase.Gotrue;
 
 namespace Hartsy.Core
 {
-    public class InteractionHandlers(Commands commands, SupabaseClient supabaseClient) : InteractionModuleBase<SocketInteractionContext>
+    public class InteractionHandlers(Commands commands, SupabaseClient supabaseClient, StableSwarmAPI stableSwarmAPI) : InteractionModuleBase<SocketInteractionContext>
     {
         private readonly Commands _commands = commands;
         private readonly SupabaseClient _supabaseClient = supabaseClient;
+        private readonly StableSwarmAPI _stableSwarmAPI = stableSwarmAPI;
         private static readonly Dictionary<(ulong, string), DateTime> _lastInteracted = [];
         private static readonly TimeSpan Cooldown = TimeSpan.FromSeconds(3); // 3 seconds cooldown
 
@@ -547,8 +547,47 @@ namespace Hartsy.Core
                     }
                     else if (actionType == "gif")
                     {
-                        // TODO: Add create GIF logic
-                        Console.WriteLine("Calling CreateGifAsync.");
+                        var payload = new Dictionary<string, object>
+                        {
+                            {"prompt", "TEST"},
+                            {"negativeprompt", "blurry"},
+                            {"images", 1},
+                            {"donotsave", true},
+                            {"model", "StarlightXL.safetensors"},
+                            {"loras", "an0tha0ne.safetensors"},
+                            {"loraweights", 0.8},
+                            {"width", 1024},
+                            {"height", 768},
+                            {"cfgscale", 6.5},
+                            {"steps", 10},
+                            {"seed", -1},
+                            {"sampler", "dpmpp_3m_sde_gpu"},
+                            {"scheduler", "karras"},
+                            {"initimage", initimage!},
+                            {"init_image_creativity", 0.7},
+                            // Video-specific parameters
+                            {"video_model", "OfficialStableDiffusion/svd_xt_1_1.safetensors"},
+                            {"video_format", "gif"},
+                            {"video_frames", 10},
+                            {"video_fps", 10},
+                            {"video_steps", 5},
+                            {"video_cfg", 2.5},
+                            {"video_min_cfg", 1},
+                            {"video_motion_bucket", 127},
+                        };
+                        IUserMessage? message = await Context.Channel.GetMessageAsync(Convert.ToUInt64(messageId)) as IUserMessage;
+                        IEmbed embed = message!.Embeds.First();
+                        var (text, description, template) = ParseEmbed(embed);
+
+                        await FollowupAsync(embed: creditEmbed, ephemeral: true);
+                        // call generate gif here
+                        await foreach (var image in _stableSwarmAPI.CreateGifAsync("username", "messageId", payload))
+                        {
+                            // Process each image here, for example:
+                            Console.WriteLine("Received a new GIF frame.");
+                            // You could save it, display it, etc.
+                        }
+                        await _supabaseClient.UpdateUserCredit(user.Id.ToString(), credits - 1);
                     }
                 }
                 else

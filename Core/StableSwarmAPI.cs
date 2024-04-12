@@ -4,6 +4,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp;
+using System.Buffers.Text;
 
 namespace Hartsy.Core
 {
@@ -303,5 +304,57 @@ namespace Hartsy.Core
                 throw;
             }
         }
+
+        /// <summary>
+        /// Asynchronously creates a GIF using a WebSocket connection based on provided image data and session configurations.
+        /// </summary>
+        /// <param name="username">The username associated with the request.</param>
+        /// <param name="messageId">The message identifier associated with the request.</param>
+        /// <param name="payload">The dictionary containing the necessary data and settings for GIF generation.</param>
+        /// <returns>A task that represents the asynchronous operation, yielding the generated GIF image.</returns>
+        public async IAsyncEnumerable<(Image<Rgba32> Image, bool IsFinal)> CreateGifAsync(string username, string messageId, Dictionary<string, object> payload)
+        {
+            using var webSocket = new ClientWebSocket();
+            await EnsureWebSocketConnectionAsync(webSocket);
+
+            // Add session ID to the payload if not already included
+            payload["session_id"] = await GetSession();
+
+            // Adjust payload for GIF generation specifics if necessary
+            // payload["gif_specific_parameter"] = "value"; // Uncomment if there are GIF-specific parameters
+
+            await SendRequestAsync(webSocket, payload);
+
+            var responseBuffer = new ArraySegment<byte>(new byte[8192]);
+            StringBuilder stringBuilder = new StringBuilder();
+
+            while (webSocket.State == WebSocketState.Open)
+            {
+                stringBuilder.Clear();
+                WebSocketReceiveResult result = await ReceiveMessage(webSocket, stringBuilder, responseBuffer);
+
+                if (result.MessageType == WebSocketMessageType.Close)
+                    break;
+
+                string jsonString = stringBuilder.ToString();
+                var responseData = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonString);
+
+                if (responseData != null && responseData.ContainsKey("gif"))
+                {
+                    bool isFinal = responseData.ContainsKey("final") && (bool)responseData["final"];
+                    string base64 = responseData["gif"].ToString();
+                    byte[] imageBytes = Convert.FromBase64String(base64);
+                    using var image = Image.Load<Rgba32>(imageBytes);
+                    yield return (image, isFinal);
+
+                    if (isFinal)
+                    {
+                        await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Received final GIF", CancellationToken.None);
+                        break;
+                    }
+                }
+            }
+        }
+
     }
 }
