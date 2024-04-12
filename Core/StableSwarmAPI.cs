@@ -320,9 +320,6 @@ namespace Hartsy.Core
             // Add session ID to the payload if not already included
             payload["session_id"] = await GetSession();
 
-            // Adjust payload for GIF generation specifics if necessary
-            // payload["gif_specific_parameter"] = "value"; // Uncomment if there are GIF-specific parameters
-
             await SendRequestAsync(webSocket, payload);
 
             var responseBuffer = new ArraySegment<byte>(new byte[8192]);
@@ -337,6 +334,8 @@ namespace Hartsy.Core
                     break;
 
                 string jsonString = stringBuilder.ToString();
+                string logString = ReplaceBase64(jsonString); // DEBUG ONLY
+                Console.WriteLine("Response JSON (excluding base64 data): " + logString); // DEBUG ONLY
                 var responseData = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonString);
 
                 if (responseData != null && responseData.ContainsKey("gif"))

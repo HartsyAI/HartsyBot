@@ -1,6 +1,7 @@
 ﻿using System.Text.RegularExpressions;
 using Discord;
 using Discord.Interactions;
+using Discord.Rest;
 using Discord.WebSocket;
 
 namespace Hartsy.Core
@@ -482,10 +483,45 @@ namespace Hartsy.Core
                     await FollowupAsync(embed: errorEmbed.Build(), ephemeral: true);
                     return;
                 }
+                string filePath = "";
+                string directoryPath = "";
+                string initimage = "";
+                try
+                {
+                    // Construct the full path
+                    directoryPath = Path.Combine(Directory.GetCurrentDirectory(), $"../../../images/{username}/{messageId}");
+                    filePath = Path.Combine(directoryPath, $"{messageId}:{selectedValue}.jpeg");
 
-                string filePath = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), $"../../../images/{username}/{messageId}/{messageId}:{selectedValue}.jpeg"));
-                // add the base 64 of the image to send to generatefromtemplate
-                string initimage = Convert.ToBase64String(File.ReadAllBytes(filePath));
+                    // Ensure the directory exists
+                    if (!Directory.Exists(directoryPath))
+                    {
+                        Console.WriteLine("Directory does not exist.");
+                        // Depending on your requirements, you can create the directory or handle it as an error
+                        Directory.CreateDirectory(directoryPath);
+                        Console.WriteLine("Directory created.");
+                    }
+
+                    // Check if the file exists
+                    if (!File.Exists(filePath))
+                    {
+                        Console.WriteLine("File does not exist.");
+                        await FollowupAsync("Error: Image not found.", ephemeral: true);
+                        return;  // Exit if the file does not exist
+                    }
+
+                    // Proceed with reading the file
+                    initimage = Convert.ToBase64String(File.ReadAllBytes(filePath));
+                }
+                catch (IOException ex)
+                {
+                    Console.WriteLine($"An I/O error occurred: {ex.Message}");
+                    await FollowupAsync("Error processing the image file.", ephemeral: true);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"An unexpected error occurred: {ex.Message}");
+                    await FollowupAsync("An unexpected error occurred while processing your request.", ephemeral: true);
+                }
 
                 SocketTextChannel? channel = Context.Channel as SocketTextChannel;
                 SocketGuildUser? user = Context.User as SocketGuildUser;
