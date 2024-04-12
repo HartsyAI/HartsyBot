@@ -170,8 +170,8 @@ namespace Hartsy.Core
                     .WithTitle("Image Generation")
                     .WithDescription($"You have {credits} GPUT. You will have {credits - 1} GPUT after this image is generated.")
                     .AddField("Generate Command", "This command allows you to generate images based on the text and template you provide. " +
-                    "Each generation will use one GPUT from your account.")
-                    .WithColor(Discord.Color.Gold)
+                    "Each generation will use one GPUT from your account.\n\nGo to [Hartsy.ai](https://hartsy.ai) to check sub status or add GPUTs")
+                    .WithColor(Color.Gold)
                     .WithCurrentTimestamp()
                     .Build();
 
@@ -308,7 +308,7 @@ namespace Hartsy.Core
                     .AddField("Next Steps", "A staff member will review the reported content shortly. If they determine that it violates our community rules, " +
                     "appropriate actions will be taken to address the issue. Deletion of the post has been disabled while staff looks into the issue.")
                     .WithFooter("Thank you for helping to maintain a safe and respectful environment. If you have any further information please contact a mod.")
-                    .WithColor(Discord.Color.Gold)
+                    .WithColor(Color.Gold)
                     .WithCurrentTimestamp()
                     .Build();
 
@@ -347,7 +347,7 @@ namespace Hartsy.Core
                         .WithTitle("Link Your Hartsy.AI Account")
                         .WithDescription($"{user.Mention}, you have not linked your Discord account with your Hartsy.AI account. Make a FREE account " +
                                                             "and log into Hartsy.AI using your Discord credentials. If you have already done that and are still having issues" +
-                                                                                                " contact an admin. This may be a bug.")
+                                                            " contact an admin. This may be a bug.\n\nGo to [Hartsy.ai](https://hartsy.ai) to check sub status or add GPUTs")
                         .WithColor(Color.Blue)
                         .WithTimestamp(DateTimeOffset.Now)
                         .Build();
@@ -410,7 +410,7 @@ namespace Hartsy.Core
                     }
                     else if (type == "gif")
                     {
-                        selectMenu.WithCustomId($"select_image:create_gif:{userId}");
+                        selectMenu.WithCustomId($"select_image:gif:{userId}:{messageId}");
                         var selectBuilder = new ComponentBuilder()
                             .WithSelectMenu(selectMenu);
                         var gifEmbed = new EmbedBuilder()

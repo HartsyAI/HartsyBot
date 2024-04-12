@@ -168,7 +168,7 @@ namespace Hartsy.Core
                     .WithTitle("Image Generation")
                     .WithDescription($"You have {credits} GPUT. You will have {credits - 1} GPUT after this image is generated.")
                     .AddField("Generate Command", "This command allows you to generate images based on the text and template you provide. " +
-                    "Each generation will use one GPUT from your account.")
+                    "Each generation will use one GPUT from your account.\n\nGo to [Hartsy.ai](https://hartsy.ai) to check sub status or add GPUTs")
                     .WithColor(Discord.Color.Gold)
                     .WithCurrentTimestamp()
                     .Build();
@@ -210,7 +210,7 @@ namespace Hartsy.Core
             var embed = new EmbedBuilder()
                 .WithTitle("Access Denied")
                 .WithDescription($"{user.Mention} You either do not have a valid subscription, you have insufficient credits, or You have not properly linked your account. " +
-                "Please visit Hartsy.AI to manage your subscription, purchase more credits, or login with Discord.")
+                "Please visit [Hartsy.AI](https://hartsy.ai) to check sub status, purchase more credits, or login with Discord.")
                 .WithColor(Discord.Color.Red)
                 .WithTimestamp(DateTimeOffset.Now)
                 .Build();
@@ -295,7 +295,7 @@ namespace Hartsy.Core
                         {"donotsave", true},
                         {"model", templateDetails.Checkpoint ?? ""},
                         {"loras", loraname ?? "an0tha0ne.safetensors"},
-                        {"loraweights", 0.9}, // loraweight ?? 0.9
+                        {"loraweights", 0.8}, // loraweight ?? 0.9
                         {"width", 1024},
                         {"height", 768},
                         {"cfgscale", templateDetails.Cfg ?? 6.5},
@@ -363,13 +363,15 @@ namespace Hartsy.Core
             string reportCustomId = $"report:{userId}";
             string i2iCustomId = $"choose_image:i2i:{userId}";
             string saveCustomId = $"choose_image:save:{userId}";
+            string gifCustomId = $"choose_image:gif:{userId}";
             return new ComponentBuilder()
-                .WithButton("Regenerate", customId, ButtonStyle.Success)
-                .WithButton("Add to Showcase", showcaseCustomId, ButtonStyle.Primary)
+                .WithButton("*Regenerate*", customId, ButtonStyle.Success)
+                .WithButton("Add to Showcase!", showcaseCustomId, ButtonStyle.Primary)
                 .WithButton("Report", reportCustomId, ButtonStyle.Secondary, emote: new Emoji("\u26A0")) // ⚠
                 .WithButton(" ", deleteCustomId, ButtonStyle.Danger, emote: new Emoji("\uD83D\uDDD1")) // 🗑
                 .WithButton("Image2Image", i2iCustomId, ButtonStyle.Secondary, row: 1)
-                .WithButton("Save To Gallery", saveCustomId, ButtonStyle.Secondary, row: 1);
+                .WithButton("Add To My Gallery", saveCustomId, ButtonStyle.Primary, row: 1)
+                .WithButton("Generate GIF", gifCustomId, ButtonStyle.Success, row: 1);
         }
     }
 }
