@@ -1,8 +1,12 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Drawing;
+using System.Text.RegularExpressions;
 using Discord;
 using Discord.Interactions;
-using Discord.Rest;
 using Discord.WebSocket;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Gif;
+using SixLabors.ImageSharp.Processing;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace Hartsy.Core
 {
@@ -131,7 +135,7 @@ namespace Hartsy.Core
 
             if (IsOnCooldown(Context.User, "regenerate"))
             {
-                await FollowupAsync ("You are on cooldown. Please wait before trying again.", ephemeral: true);
+                await FollowupAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
                 return;
             }
             var message = (Context.Interaction as SocketMessageComponent)?.Message;
@@ -172,7 +176,7 @@ namespace Hartsy.Core
                     .WithDescription($"You have {credits} GPUT. You will have {credits - 1} GPUT after this image is generated.")
                     .AddField("Generate Command", "This command allows you to generate images based on the text and template you provide. " +
                     "Each generation will use one GPUT from your account.\n\nGo to [Hartsy.ai](https://hartsy.ai) to check sub status or add GPUTs")
-                    .WithColor(Color.Gold)
+                    .WithColor(Discord.Color.Gold)
                     .WithCurrentTimestamp()
                     .Build();
 
@@ -289,7 +293,7 @@ namespace Hartsy.Core
                     $"\n\n<@{userId}> may have created an image that breaks the community rules. A mod needs to look at this ASAP!")
                     .AddField("Reported by", user.Mention, true)
                     .AddField("Message Link", $"[Jump to message]({message.GetJumpUrl()})", true)
-                    .WithColor(Color.Red)
+                    .WithColor(Discord.Color.Red)
                     .WithTimestamp(DateTimeOffset.Now)
                     .Build();
 
@@ -309,7 +313,7 @@ namespace Hartsy.Core
                     .AddField("Next Steps", "A staff member will review the reported content shortly. If they determine that it violates our community rules, " +
                     "appropriate actions will be taken to address the issue. Deletion of the post has been disabled while staff looks into the issue.")
                     .WithFooter("Thank you for helping to maintain a safe and respectful environment. If you have any further information please contact a mod.")
-                    .WithColor(Color.Gold)
+                    .WithColor(Discord.Color.Gold)
                     .WithCurrentTimestamp()
                     .Build();
 
@@ -349,7 +353,7 @@ namespace Hartsy.Core
                         .WithDescription($"{user.Mention}, you have not linked your Discord account with your Hartsy.AI account. Make a FREE account " +
                                                             "and log into Hartsy.AI using your Discord credentials. If you have already done that and are still having issues" +
                                                             " contact an admin. This may be a bug.\n\nGo to [Hartsy.ai](https://hartsy.ai) to check sub status or add GPUTs")
-                        .WithColor(Color.Blue)
+                        .WithColor(Discord.Color.Blue)
                         .WithTimestamp(DateTimeOffset.Now)
                         .Build();
 
@@ -387,7 +391,7 @@ namespace Hartsy.Core
                         var itiEmbed = new EmbedBuilder()
                             .WithTitle("Select Image")
                             .WithDescription("Choose an image and we will generate 4 new images based off of that.")
-                            .WithColor(Color.Purple)
+                            .WithColor(Discord.Color.Purple)
                             .WithCurrentTimestamp();
 
                         await RespondAsync(embed: itiEmbed.Build(), components: selectBuilder.Build(), ephemeral: true);
@@ -402,7 +406,7 @@ namespace Hartsy.Core
                         var saveEmbed = new EmbedBuilder()
                             .WithTitle("Select Image")
                             .WithDescription("Select the image you wish to save to the gallery")
-                            .WithColor(Color.Blue)
+                            .WithColor(Discord.Color.Blue)
                             .WithCurrentTimestamp();
 
                         await RespondAsync(embed: saveEmbed.Build(), components: selectBuilder.Build(), ephemeral: true);
@@ -417,7 +421,7 @@ namespace Hartsy.Core
                         var gifEmbed = new EmbedBuilder()
                             .WithTitle("Select Images")
                             .WithDescription("Select the images you wish to create a GIF from")
-                            .WithColor(Color.Green)
+                            .WithColor(Discord.Color.Green)
                             .WithCurrentTimestamp();
 
                         await RespondAsync(embed: gifEmbed.Build(), components: selectBuilder.Build(), ephemeral: true);
@@ -432,7 +436,7 @@ namespace Hartsy.Core
                         var showcaseEmbed = new EmbedBuilder()
                             .WithTitle("Select Image for Showcase")
                             .WithDescription("Select an image to add to the #showcase channel. Other users will be able to vote on your image.")
-                            .WithColor(Color.Blue)
+                            .WithColor(Discord.Color.Blue)
                             .WithCurrentTimestamp();
 
                         await RespondAsync(embed: showcaseEmbed.Build(), components: selectBuilder.Build(), ephemeral: true);
@@ -477,7 +481,7 @@ namespace Hartsy.Core
                     EmbedBuilder errorEmbed = new EmbedBuilder()
                         .WithTitle("Selection Error")
                         .WithDescription("Error: You cannot select another user's image.")
-                        .WithColor(Color.Red)
+                        .WithColor(Discord.Color.Red)
                         .WithCurrentTimestamp();
 
                     await FollowupAsync(embed: errorEmbed.Build(), ephemeral: true);
@@ -539,7 +543,7 @@ namespace Hartsy.Core
                                 .WithDescription($"You have {credits} GPUT. You will have {credits - 1} GPUT after this image is generated.")
                                 .AddField("Generate Command", "This command allows you to generate images based on the text and template you provide. " +
                                 "Each generation will use one GPUT from your account.\n\nGo to [Hartsy.ai](https://hartsy.ai) to check sub status or add GPUTs")
-                                .WithColor(Color.Gold)
+                                .WithColor(Discord.Color.Gold)
                                 .WithCurrentTimestamp()
                                 .Build();
 
@@ -566,7 +570,7 @@ namespace Hartsy.Core
                             var embed = new EmbedBuilder()
                                 .WithTitle("Image Saved Successfully")
                                 .WithDescription("Your image has been added to your gallery. You can go to [Hartsy.ai](https://hartsy.ai) to view and download.")
-                                .WithColor(Color.Green)
+                                .WithColor(Discord.Color.Green)
                                 .WithCurrentTimestamp();
 
                             await FollowupAsync(embed: embed.Build(), ephemeral: true);
@@ -585,7 +589,7 @@ namespace Hartsy.Core
                     {
                         var payload = new Dictionary<string, object>
                         {
-                            {"prompt", "TEST"},
+                            {"prompt", "clear vibrant text"},
                             {"negativeprompt", "blurry"},
                             {"images", 1},
                             {"donotsave", true},
@@ -595,45 +599,87 @@ namespace Hartsy.Core
                             {"width", 1024},
                             {"height", 768},
                             {"cfgscale", 6.5},
-                            {"steps", 10},
+                            {"steps", 1},
                             {"seed", -1},
                             {"sampler", "dpmpp_3m_sde_gpu"},
                             {"scheduler", "karras"},
                             {"initimage", initimage!},
-                            {"init_image_creativity", 0.7},
-                            // Video-specific parameters
+                            {"init_image_creativity", 0},
+                            // Video-specific parameters //
                             {"video_model", "OfficialStableDiffusion/svd_xt_1_1.safetensors"},
                             {"video_format", "gif"},
-                            {"video_frames", 10},
-                            {"video_fps", 10},
-                            {"video_steps", 5},
+                            {"videopreviewtype", "iterate"},
+                            {"videoresolution", "image"},
+                            {"videoboomerang", true},
+                            {"video_frames", 25},
+                            {"video_fps", 60},
+                            {"video_steps", 22},
                             {"video_cfg", 2.5},
                             {"video_min_cfg", 1},
                             {"video_motion_bucket", 127},
                         };
-                        IUserMessage? message = await Context.Channel.GetMessageAsync(Convert.ToUInt64(messageId)) as IUserMessage;
-                        IEmbed embed = message!.Embeds.First();
-                        var (text, description, template) = ParseEmbed(embed);
+                        var processingMessage = await Context.Channel.SendMessageAsync("Starting GIF generation...");
+                        EmbedBuilder updatedEmbed = new EmbedBuilder().WithTitle("GIF Generation in Progress...");
 
-                        await FollowupAsync(embed: creditEmbed, ephemeral: true);
-                        // call generate gif here
-                        await foreach (var image in _stableSwarmAPI.CreateGifAsync("username", "messageId", payload))
+                        await foreach (var (base64String, isFinal, ETR) in _stableSwarmAPI.CreateGifAsync(payload, username, processingMessage.Id))
                         {
-                            // Process each image here, for example:
-                            Console.WriteLine("Received a new GIF frame.");
-                            // You could save it, display it, etc.
+                            try
+                            {
+                                // Convert the base64 string to a byte array
+                                var imageData = Convert.FromBase64String(base64String);
+                                using var imageStream = new MemoryStream(imageData);
+                                imageStream.Position = 0; // Ensure the stream position is at the beginning for all checks
+                                string suffix = "";
+                                MemoryStream? embedStream = null;
+
+                                // Read the necessary header bytes for the largest expected header
+                                byte[] header = new byte[12];
+                                if (imageStream.Length >= header.Length)
+                                {
+                                    imageStream.Read(header, 0, header.Length);
+                                    imageStream.Position = 0; // Reset position if further operations are needed on the stream
+
+                                    // Check if GIF
+                                    if (header[0] == 0x47 && header[1] == 0x49 && header[2] == 0x46)
+                                    {
+                                        suffix = "gif";
+                                        Console.WriteLine("GIF generated");
+                                        embedStream = imageStream;
+                                    }
+                                    // Check if JPEG
+                                    else if (header[0] == 0xFF && header[1] == 0xD8)
+                                    {
+                                        suffix = "jpeg";
+                                        Console.WriteLine("JPEG generated");
+                                        embedStream = imageStream;
+                                        // resize the image to 1024x768
+                                        using var image = SixLabors.ImageSharp.Image.Load(imageData);
+                                        image.Mutate(i => i.Resize(1024, 768));
+                                        embedStream = new MemoryStream();
+                                        image.SaveAsJpeg(embedStream);
+                                    }
+                                }
+
+                                FileAttachment file = new FileAttachment(embedStream, $"new_image.{suffix}");
+                                updatedEmbed.WithImageUrl($"attachment://new_image.{suffix}");
+                                updatedEmbed.WithColor(Discord.Color.Red);
+                                updatedEmbed.WithDescription($"Estimated Time Remaining: {ETR}");
+
+                                await processingMessage.ModifyAsync(msg =>
+                                {
+                                    msg.Embeds = new[] { updatedEmbed.Build() };
+                                    msg.Content = isFinal ? "Final GIF generated:" : "Updating GIF...";
+                                    msg.Attachments = new[] { file };
+                                });
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"An error occurred: {ex.Message}");
+                            }
                         }
-                        await _supabaseClient.UpdateUserCredit(user.Id.ToString(), credits - 1);
+
                     }
                 }
-                else
-                {
-                    await FollowupAsync("Image not found.", ephemeral: true);
-                }
-            }
-            else
-            {
-                await FollowupAsync("No option selected.", ephemeral: true);
             }
         }
     }

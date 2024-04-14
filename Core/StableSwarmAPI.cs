@@ -5,6 +5,8 @@ using Newtonsoft.Json.Linq;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp;
 using System.Buffers.Text;
+using Discord.WebSocket;
+using Discord;
 
 namespace Hartsy.Core
 {
@@ -66,7 +68,7 @@ namespace Hartsy.Core
         /// <param name="stringBuilder">The StringBuilder to append the received message to.</param>
         /// <param name="responseBuffer">The buffer to store the response bytes.</param>
         /// <returns>A task that represents the asynchronous operation. The task result contains the WebSocket receive result.</returns>
-        private static async Task<WebSocketReceiveResult> ReceiveMessage(ClientWebSocket webSocket, 
+        private static async Task<WebSocketReceiveResult> ReceiveMessage(ClientWebSocket webSocket,
             StringBuilder stringBuilder, ArraySegment<byte> responseBuffer)
         {
             WebSocketReceiveResult result;
@@ -179,7 +181,7 @@ namespace Hartsy.Core
                             string base64WithPrefix = value.ToString()!;
                             string base64 = await RemovePrefix(base64WithPrefix);
                             finalImages[batchIndex] = new Dictionary<string, string> { { "base64", $"{base64}" } };
-                            
+
                             if (batchIndex == 3)
                             {
                                 Image<Rgba32> final = await HandleFinal(finalImages, username, messageId);
@@ -193,44 +195,61 @@ namespace Hartsy.Core
                 }
             }
         }
-        /// <summary>Replaces base64 image data in the JSON string with a placeholder to avoid large log entries.</summary>
+        /// <summary>
+        /// Replaces base64 image data in the JSON string with a placeholder to avoid large log entries.
+        /// Additionally, appends the cleaned JSON to a text file.
+        /// </summary>
         /// <param name="jsonString">The JSON string containing base64 image data.</param>
-        /// <returns>A string where base64 image data is replaced with a placeholder.</returns>
-        // DEBUG ONLY
-#pragma warning disable IDE0051 // Remove unused private members
+        /// <returns>A string where base64 image data is replaced with a placeholder and appended to a file.</returns>
         private static string ReplaceBase64(string jsonString)
-#pragma warning restore IDE0051 // Remove unused private members
         {
-            const string previewPrefix = "\"preview\":\"data:image/jpeg;base64,";
-            const string imagePrefix = "\"image\":\"data:image/jpeg;base64,";
+            // List of base64 image data prefixes to replace with a placeholder
+            var prefixes = new List<string>
+                {
+                    "\"preview\":\"data:image/jpeg;base64,",
+                    "\"image\":\"data:image/jpeg;base64,",
+                    "\"preview\":\"data:image/png;base64,",
+                    "\"image\":\"data:image/png;base64,",
+                    "\"preview\":\"data:image/gif;base64,",
+                    "\"image\":\"data:image/gif;base64,",
+                    "\"preview\":\"data:image/webp;base64,",
+                    "\"image\":\"data:image/webp;base64,"
+                };
 
-            static string ReplaceBase64Content(string str, string prefix)
+            foreach (var prefix in prefixes)
             {
-                int start = str.IndexOf(prefix);
+                int start = jsonString.IndexOf(prefix);
                 while (start != -1)
                 {
-                    int end = str.IndexOf('"', start + prefix.Length);
+                    int end = jsonString.IndexOf('"', start + prefix.Length);
                     if (end != -1)
                     {
-                        str = str.Remove(start, end - start + 1).Insert(start, $"{prefix}[BASE64_DATA]\"");
+                        // Replacing the base64 string with a placeholder
+                        jsonString = jsonString.Remove(start, end - start + 1).Insert(start, $"{prefix}[BASE64_DATA]\"");
+                        // Move to the next occurrence
+                        start = jsonString.IndexOf(prefix, start + prefix.Length + "[BASE64_DATA]\"".Length);
                     }
-                    start = str.IndexOf(prefix, start + prefix.Length);
+                    else
+                    {
+                        // If no closing quote is found, break from the loop
+                        break;
+                    }
                 }
-                return str;
             }
 
-            jsonString = ReplaceBase64Content(jsonString, previewPrefix);
-            jsonString = ReplaceBase64Content(jsonString, imagePrefix);
+            // Append the modified JSON string to a text file
+            File.AppendAllText("json.txt", jsonString + Environment.NewLine);
 
             return jsonString;
         }
+
 
         /// <summary>Processes the preview images for a given batch.</summary>
         /// <param name="previewImages">A dictionary of image data where each key represents a batch index, 
         /// and the value is another dictionary containing image base64.</param>
         /// <param name="batchCount">How many batches have been processed.</param>
         /// <returns>A grid image of the preview images for the batch if count meets frequency; otherwise, null.</returns>
-        private static async Task<Image<Rgba32>?> HandlePreview(Dictionary<int, Dictionary<string, string>> previewImages, 
+        private static async Task<Image<Rgba32>?> HandlePreview(Dictionary<int, Dictionary<string, string>> previewImages,
             int batchCount, string username, ulong messageId)
         {
             if (batchCount % batchProcessFrequency == 0)
@@ -312,18 +331,19 @@ namespace Hartsy.Core
         /// <param name="messageId">The message identifier associated with the request.</param>
         /// <param name="payload">The dictionary containing the necessary data and settings for GIF generation.</param>
         /// <returns>A task that represents the asynchronous operation, yielding the generated GIF image.</returns>
-        public async IAsyncEnumerable<(Image<Rgba32> Image, bool IsFinal)> CreateGifAsync(string username, string messageId, Dictionary<string, object> payload)
+        public async IAsyncEnumerable<(string Base64, bool IsFinal, string ETR)> CreateGifAsync(Dictionary<string, object> payload, string username, ulong messageId)
         {
             using var webSocket = new ClientWebSocket();
             await EnsureWebSocketConnectionAsync(webSocket);
-
-            // Add session ID to the payload if not already included
             payload["session_id"] = await GetSession();
-
             await SendRequestAsync(webSocket, payload);
 
             var responseBuffer = new ArraySegment<byte>(new byte[8192]);
             StringBuilder stringBuilder = new StringBuilder();
+            DateTime startTime = DateTime.UtcNow;
+            double lastPercent = 0;
+            TimeSpan estimatedTimeRemaining = TimeSpan.Zero;
+
 
             while (webSocket.State == WebSocketState.Open)
             {
@@ -334,26 +354,74 @@ namespace Hartsy.Core
                     break;
 
                 string jsonString = stringBuilder.ToString();
-                string logString = ReplaceBase64(jsonString); // DEBUG ONLY
-                Console.WriteLine("Response JSON (excluding base64 data): " + logString); // DEBUG ONLY
+                string logString = ReplaceBase64(jsonString); // Reduces log size by replacing base64 content
+                Console.WriteLine("Response JSON (excluding base64 data): " + logString);
                 var responseData = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonString);
+                bool isFinal = false;
 
-                if (responseData != null && responseData.ContainsKey("gif"))
-                {
-                    bool isFinal = responseData.ContainsKey("final") && (bool)responseData["final"];
-                    string base64 = responseData["gif"].ToString();
-                    byte[] imageBytes = Convert.FromBase64String(base64);
-                    using var image = Image.Load<Rgba32>(imageBytes);
-                    yield return (image, isFinal);
-
-                    if (isFinal)
+                foreach (var kvp in responseData!)
+                { 
+                    if (responseData != null)
                     {
-                        await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Received final GIF", CancellationToken.None);
-                        break;
+                        if (kvp.Value is JObject genProgressData)
+                        {
+                            if (genProgressData.ContainsKey("preview"))
+                            {
+                                Console.WriteLine($"\n\nPreview found\n\n");
+                                int batchIndex = Convert.ToInt32(genProgressData["batch_index"]);
+                                string base64WithPrefix = genProgressData["preview"]!.ToString();
+                                string overall = genProgressData["overall_percent"]!.ToString();
+                                string current = genProgressData["current_percent"]!.ToString();
+                                string base64 = await RemovePrefix(base64WithPrefix);
+                                yield return (base64, isFinal, estimatedTimeRemaining.ToString(@"hh\:mm\:ss"));
+                            }
+
+                        }
+                        if (responseData.TryGetValue("image", out object? value))
+                        {
+                            Console.WriteLine($"\n\nImage found\n\n");
+                            int batchIndex = Convert.ToInt32(responseData["batch_index"]);
+                            string base64WithPrefix = value.ToString()!;
+                            string base64 = await RemovePrefix(base64WithPrefix);
+                            // check if image is a gif mark final as true
+                            if (base64WithPrefix.Contains("data:image/gif;base64"))
+                            {
+                                isFinal = true;
+                            }
+                            yield return (base64, isFinal, estimatedTimeRemaining.ToString(@"hh\:mm\:ss"));
+                        }
+                        if (responseData.TryGetValue("gen_progress", out object progressData))
+                        {
+                            var progressDict = progressData as JObject;
+                            double overallPercent = (double)progressDict["overall_percent"];
+                            double currentPercent = (double)progressDict["current_percent"];
+                            // Reset start time until progress begins
+                            if (currentPercent == 0.0)
+                            {
+                                startTime = DateTime.UtcNow;
+                                lastPercent = 0;
+                                continue;  // Skip until progress starts
+                            }
+
+                            if (currentPercent > lastPercent)
+                            {
+                                TimeSpan timeElapsed = DateTime.UtcNow - startTime;
+                                double percentComplete = currentPercent;
+                                double totalEstimatedTime = timeElapsed.TotalSeconds / percentComplete;
+
+                                totalEstimatedTime = Math.Min(totalEstimatedTime, 24 * 60 * 60); // Cap at 24 hours
+                                estimatedTimeRemaining = TimeSpan.FromSeconds((1 - percentComplete) * totalEstimatedTime);
+                                lastPercent = currentPercent;
+                            }
+                        }
+                        if (isFinal)
+                        {
+                            await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "All final images received", CancellationToken.None);
+                            break;
+                        }
                     }
                 }
             }
         }
-
     }
 }

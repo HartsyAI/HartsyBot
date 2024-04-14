@@ -291,7 +291,7 @@ namespace Hartsy.Core
                         {"prompt", prompt},
                         {"negativeprompt", templateDetails.Negative ?? ""},
                         {"images", 1},
-                        //{"batchsize", 4},
+                        {"batchsize", 4},
                         {"donotsave", true},
                         {"model", templateDetails.Checkpoint ?? ""},
                         {"loras", loraname ?? "an0tha0ne.safetensors"},
@@ -305,15 +305,6 @@ namespace Hartsy.Core
                         {"scheduler", templateDetails.Scheduler ?? "karras"},
                         {"initimage", initimage!},
                         {"init_image_creativity", 0.7},
-                        // Video-specific parameters
-                        {"video_model", "OfficialStableDiffusion/svd_xt_1_1.safetensors"},
-                        {"video_format", "gif"},
-                        {"video_frames", 10},
-                        {"video_fps", 10},
-                        {"video_steps", 5},
-                        {"video_cfg", 2.5},
-                        {"video_min_cfg", 1},
-                        {"video_motion_bucket", 127},
                     };
             }
             var previewMsg = await channel!.SendMessageAsync(embed: embed);
