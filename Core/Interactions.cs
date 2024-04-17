@@ -1,12 +1,11 @@
-﻿using System.Drawing;
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using Discord;
 using Discord.Interactions;
 using Discord.WebSocket;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Gif;
 using SixLabors.ImageSharp.Processing;
-using static System.Net.Mime.MediaTypeNames;
+using SixLabors.ImageSharp.Processing.Processors.Quantization;
 
 namespace Hartsy.Core
 {
@@ -79,7 +78,6 @@ namespace Hartsy.Core
             {
                 await user.RemoveRolesAsync(rolesToRemove);
             }
-
             string response = "";
             if (rolesToAdd.Count != 0)
             {
@@ -89,7 +87,6 @@ namespace Hartsy.Core
             {
                 response += $"The {string.Join(", ", rolesToRemove.Select(r => r.Name))} role(s) have been removed from you!";
             }
-
             await RespondAsync(response, ephemeral: true);
 
             // TODO: Add a check if the user has linked their discord account with their Hartsy.AI account and if they are a subscriber
@@ -608,7 +605,7 @@ namespace Hartsy.Core
                             // Video-specific parameters //
                             {"video_model", "OfficialStableDiffusion/svd_xt_1_1.safetensors"},
                             {"video_format", "gif"},
-                            {"videopreviewtype", "iterate"},
+                            {"videopreviewtype", "animate"},
                             {"videoresolution", "image"},
                             {"videoboomerang", true},
                             {"video_frames", 25},
@@ -628,9 +625,9 @@ namespace Hartsy.Core
                                 // Convert the base64 string to a byte array
                                 var imageData = Convert.FromBase64String(base64String);
                                 using var imageStream = new MemoryStream(imageData);
+                                MemoryStream embedStream = new MemoryStream();
                                 imageStream.Position = 0; // Ensure the stream position is at the beginning for all checks
                                 string suffix = "";
-                                MemoryStream? embedStream = null;
 
                                 // Read the necessary header bytes for the largest expected header
                                 byte[] header = new byte[12];
@@ -658,26 +655,55 @@ namespace Hartsy.Core
                                         embedStream = new MemoryStream();
                                         image.SaveAsJpeg(embedStream);
                                     }
+                                    // Check for WebP
+                                    else if (header[8] == 0x57 && header[9] == 0x45 && header[10] == 0x42 && header[11] == 0x50)
+                                    {
+                                        suffix = "gif";
+                                        Console.WriteLine("WebP detected");
+                                        try
+                                        {
+                                            // Load the WebP image directly from the byte array
+                                            using (var image = SixLabors.ImageSharp.Image.Load(imageData))
+                                            {
+                                                // Triple the dimensions of the image
+                                                int newWidth = image.Width * 3;
+                                                int newHeight = image.Height * 3;
+                                                // Resize the image
+                                                image.Mutate(x => x.Resize(newWidth, newHeight));
+                                                // Configure the GIF encoder to handle animation if necessary
+                                                var encoder = new GifEncoder()
+                                                {
+                                                    ColorTableMode = GifColorTableMode.Global,  // Use global color table for better compression
+                                                    Quantizer = new WebSafePaletteQuantizer(),  // Reduce the number of colors if necessary
+                                                };
+                                                // Save the image as GIF to the MemoryStream
+                                                image.SaveAsGif(embedStream, encoder);
+                                            }
+                                            embedStream.Position = 0;  // Reset the position of the MemoryStream for reading
+                                        }
+                                        catch (Exception ex)
+                                        {
+                                            Console.WriteLine($"An error occurred during the WebP to GIF conversion: {ex.Message}");
+                                        }
+                                    }
+                                    // Use the MemoryStream for attachment and message updating
+                                    FileAttachment file = new FileAttachment(embedStream, $"new_image.{suffix}");
+                                    updatedEmbed.WithImageUrl($"attachment://new_image.{suffix}");
+                                    updatedEmbed.WithColor(Discord.Color.Red);
+                                    updatedEmbed.WithDescription($"Estimated Time Remaining: {ETR}");
+                                    await processingMessage.ModifyAsync(msg =>
+                                    {
+                                        msg.Embeds = new[] { updatedEmbed.Build() };
+                                        msg.Content = isFinal ? "Final GIF generated:" : "Updating GIF...";
+                                        msg.Attachments = new[] { file };
+                                    });
                                 }
-
-                                FileAttachment file = new FileAttachment(embedStream, $"new_image.{suffix}");
-                                updatedEmbed.WithImageUrl($"attachment://new_image.{suffix}");
-                                updatedEmbed.WithColor(Discord.Color.Red);
-                                updatedEmbed.WithDescription($"Estimated Time Remaining: {ETR}");
-
-                                await processingMessage.ModifyAsync(msg =>
-                                {
-                                    msg.Embeds = new[] { updatedEmbed.Build() };
-                                    msg.Content = isFinal ? "Final GIF generated:" : "Updating GIF...";
-                                    msg.Attachments = new[] { file };
-                                });
                             }
                             catch (Exception ex)
                             {
                                 Console.WriteLine($"An error occurred: {ex.Message}");
                             }
                         }
-
                     }
                 }
             }
