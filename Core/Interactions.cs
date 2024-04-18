@@ -591,7 +591,7 @@ namespace Hartsy.Core
                             {"images", 1},
                             {"donotsave", true},
                             {"model", "StarlightXL.safetensors"},
-                            {"loras", "an0tha0ne.safetensors"},
+                            {"loras", "an0tha0ne"},
                             {"loraweights", 0.8},
                             {"width", 1024},
                             {"height", 768},
