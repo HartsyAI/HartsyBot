@@ -294,7 +294,7 @@ namespace Hartsy.Core
                         {"batchsize", 4},
                         {"donotsave", true},
                         {"model", templateDetails.Checkpoint ?? ""},
-                        {"loras", loraname ?? "an0tha0ne"},
+                        {"loras", "an0tha0ne"},
                         {"loraweights", 0.8}, // loraweight ?? 0.9
                         {"width", 1024},
                         {"height", 768},
