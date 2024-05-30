@@ -18,41 +18,32 @@ namespace Hartsy.Core
             var firstImageEntry = imagesData.Values.First().First();
             byte[] firstImageBytes = Convert.FromBase64String(firstImageEntry.Value);
             using var firstImage = Image.Load<Rgba32>(firstImageBytes);
-
             int imageWidth = firstImage.Width;
             int imageHeight = firstImage.Height;
             bool isPreview = imageWidth < 1024;
             int multiplier = isPreview ? 2 : 1;
             int gridWidth = imageWidth * 2 * multiplier;
             int gridHeight = imageHeight * 2 * multiplier;
-
             using var gridImage = new Image<Rgba32>(gridWidth, gridHeight);
-
             foreach (var imageEntry in imagesData)
             {
                 int index = imageEntry.Key;
                 var imageData = imageEntry.Value;
-
                 try
                 {
                     if (imageData.TryGetValue("base64", out var base64))
                     {
                         byte[] imageBytes = Convert.FromBase64String(base64);
                         using var image = Image.Load<Rgba32>(imageBytes);
-
                         // Calculate x and y based on index to arrange in 2x2 grid
                         int x = (index % 2) * imageWidth * multiplier;
                         int y = (index / 2) * imageHeight * multiplier;
-
                         if (isPreview)
                         {
                             image.Mutate(i => i.Resize(imageWidth * multiplier, imageHeight * multiplier));
                         }
-
                         gridImage.Mutate(ctx => ctx.DrawImage(image, new Point(x, y), 1f));
-
                         await SaveImageAsync(image, username, messageId, index);
-
                     }
                 }
                 catch (Exception ex)
@@ -81,7 +72,6 @@ namespace Hartsy.Core
             {
                 var directoryPath = Path.Combine(Directory.GetCurrentDirectory(), $"../../../images/{username}/{messageId}/");
                 Directory.CreateDirectory(directoryPath);  // Ensure the directory exists
-
                 var filePath = Path.Combine(directoryPath, $"{messageId}:image_{imageIndex}.jpeg");
                 await image.SaveAsJpegAsync(filePath);
             }
@@ -98,20 +88,17 @@ namespace Hartsy.Core
                 Console.WriteLine(watermarkImagePath);
                 using var watermarkImage = await Image.LoadAsync<Rgba32>(watermarkImagePath);
                 watermarkImage.Mutate(x => x.Opacity(0.2f)); // Apply 30% transparency to the watermark image
-
                 // Calculate the size of each quadrant
                 int quadrantWidth = gridImage.Width / 2;
                 int quadrantHeight = gridImage.Height / 2;
-
                 // Calculate the locations for each watermark in each quadrant
                 var locations = new[]
                 {
-            new Point(quadrantWidth - watermarkImage.Width, quadrantHeight - watermarkImage.Height),
-            new Point(gridImage.Width - watermarkImage.Width, quadrantHeight - watermarkImage.Height),
-            new Point(quadrantWidth - watermarkImage.Width, gridImage.Height - watermarkImage.Height),
-            new Point(gridImage.Width - watermarkImage.Width, gridImage.Height - watermarkImage.Height)
-        };
-
+                    new Point(quadrantWidth - watermarkImage.Width, quadrantHeight - watermarkImage.Height),
+                    new Point(gridImage.Width - watermarkImage.Width, quadrantHeight - watermarkImage.Height),
+                    new Point(quadrantWidth - watermarkImage.Width, gridImage.Height - watermarkImage.Height),
+                    new Point(gridImage.Width - watermarkImage.Width, gridImage.Height - watermarkImage.Height)
+                };
                 // Draw the watermark image on each quadrant
                 foreach (var location in locations)
                 {

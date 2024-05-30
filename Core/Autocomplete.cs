@@ -1,5 +1,6 @@
 ﻿using Discord.Interactions;
 using Discord;
+using Hartsy.Core.SupaBase;
 
 namespace Hartsy.Core
 {

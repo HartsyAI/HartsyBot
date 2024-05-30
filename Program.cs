@@ -5,6 +5,7 @@ using dotenv.net;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Hartsy.Core;
+using Hartsy.Core.SupaBase;
 
 namespace HartsyBot
 {
@@ -22,50 +23,42 @@ namespace HartsyBot
         public async Task MainAsync()
         {
             // Try to get the bot token from environment variables
-            var token = Environment.GetEnvironmentVariable("BOT_TOKEN");
-
+            string token = Environment.GetEnvironmentVariable("BOT_TOKEN") ?? "";
             // If token is not found in environment variables, load from .env file
             if (string.IsNullOrEmpty(token))
             {
-                var envFilePath = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "../../../.env"));
+                string envFilePath = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "../../../.env"));
                 Console.WriteLine("Attempting to load .env file from: " + envFilePath);
 
                 if (File.Exists(envFilePath))
                 {
-                    var envOptions = new DotEnvOptions(envFilePaths: [envFilePath]);
+                    DotEnvOptions envOptions = new(envFilePaths: [envFilePath]);
                     DotEnv.Load(envOptions);
-                    token = Environment.GetEnvironmentVariable("BOT_TOKEN");
+                    token = Environment.GetEnvironmentVariable("BOT_TOKEN") ?? "";
                 }
             }
-
             _serviceProvider = ConfigureServices();
             _client = _serviceProvider.GetRequiredService<DiscordSocketClient>();
             _interactions = _serviceProvider.GetRequiredService<InteractionService>();
-
             _client.InteractionCreated += async interaction =>
             {
                 SocketInteractionContext ctx = new(_client, interaction);
                 await _interactions.ExecuteCommandAsync(ctx, _serviceProvider);
             };
-
             _client.Log += Log;
             _interactions.Log += Log;
             _client.Ready += () => ReadyAsync();
-
             // Initialize and register event handlers
             SupabaseClient supabaseClient = _serviceProvider.GetRequiredService<SupabaseClient>();
             EventHandlers eventHandlers = new(_client, supabaseClient);
             eventHandlers.RegisterHandlers();
-
             if (string.IsNullOrEmpty(token))
             {
                 Console.WriteLine("Bot token is null or empty. Check your .env file.");
                 return;
             }
-
             await _client.LoginAsync(TokenType.Bot, token);
             await _client.StartAsync();
-
             // Block this task until the program is closed.
             await Task.Delay(-1);
         }
@@ -87,6 +80,7 @@ namespace HartsyBot
                 .AddSingleton<StableSwarmAPI>()
                 .AddSingleton<Showcase>()
                 .AddSingleton<Commands>()
+                .AddSingleton(new HttpClient())
                 .BuildServiceProvider();
         }
 
@@ -113,7 +107,6 @@ namespace HartsyBot
                 {
                     Console.WriteLine($"\nNo guilds found\n");
                 }
-
                 Console.WriteLine($"\nLogged in as {_client.CurrentUser.Username}\n" +
                     $"Registered {_interactions!.SlashCommands.Count} slash commands\n" +
                     $"Bot is a member of {_client.Guilds.Count} guilds\n");

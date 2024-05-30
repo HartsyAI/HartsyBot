@@ -2,10 +2,9 @@
 using Discord.WebSocket;
 using Discord;
 using SixLabors.ImageSharp;
-using System.Text.Json;
-using Supabase.Gotrue;
-using Supabase.Interfaces;
 using Newtonsoft.Json.Linq;
+using Hartsy.Core.SupaBase;
+using Hartsy.Core.SupaBase.Models;
 
 namespace Hartsy.Core
 {
@@ -40,7 +39,6 @@ namespace Hartsy.Core
                     .WithColor(Discord.Color.Blue)
                     .WithFooter(footer => footer.Text = "For more information, visit Hartsy.AI")
                     .WithCurrentTimestamp();
-
                 await RespondAsync(embed: embed.Build());
             }
             catch (Exception ex)
@@ -77,10 +75,8 @@ namespace Hartsy.Core
                     await RespondAsync(embed: embed, ephemeral: true);
                     return;
                 }
-
-                var userInfo = await _supabaseClient.GetUserByDiscordId(user?.Id.ToString() ?? "");
-                var subscriptionInfo = userInfo != null ? await _supabaseClient.GetSubscriptionByUserId(userInfo.Id ?? "0") : null;
-
+                Users? userInfo = await _supabaseClient.GetUserByDiscordId(user?.Id.ToString() ?? "");
+                Users? subscriptionInfo = userInfo != null ? await _supabaseClient.GetSubscriptionByUserId(userInfo.Id ?? "0") : null;
                 if (userInfo != null)
                 {
                     var embed = new EmbedBuilder()
@@ -95,7 +91,6 @@ namespace Hartsy.Core
                     {
                         embed.AddField("Subscription Status", subscriptionInfo.PlanName ?? "N/A", true);
                     }
-
                     embed.WithColor(Discord.Color.Blue);
                     await RespondAsync(embed: embed.Build(), ephemeral: true);
                 }
@@ -110,7 +105,6 @@ namespace Hartsy.Core
                         .WithThumbnailUrl(Context.Client.CurrentUser.GetAvatarUrl() ?? Context.Client.CurrentUser.GetDefaultAvatarUrl())
                         .WithTimestamp(DateTimeOffset.Now)
                         .Build();
-
                     await RespondAsync(embed: embed, ephemeral: true);
                 }
             }
@@ -146,12 +140,11 @@ namespace Hartsy.Core
                     .WithFooter("This is a reminder to use the system responsibly and ethically.")
                     .WithCurrentTimestamp()
                     .Build();
-
                 await FollowupAsync(embed: embed, ephemeral: true);
                 return;
             }
             SocketGuildUser user = (SocketGuildUser)Context.User;
-            var userInfo = await _supabaseClient.GetUserByDiscordId(user?.Id.ToString() ?? "");
+            Users? userInfo = await _supabaseClient.GetUserByDiscordId(user?.Id.ToString() ?? "");
             if (userInfo == null)
             {
                 await HandleSubscriptionFailure(Context);
@@ -172,12 +165,9 @@ namespace Hartsy.Core
                     .WithColor(Discord.Color.Gold)
                     .WithCurrentTimestamp()
                     .Build();
-
                 await FollowupAsync(embed: embed, ephemeral: true);
-
                 // Add the role to the user if they do not have it
                 await AddSubRole(user, subStatus);
-
                 SocketTextChannel? channel = Context.Channel as SocketTextChannel;
                 // Proceed with image generation
                 await GenerateFromTemplate(text, template, channel, user, description);
@@ -214,7 +204,6 @@ namespace Hartsy.Core
                 .WithColor(Discord.Color.Red)
                 .WithTimestamp(DateTimeOffset.Now)
                 .Build();
-
             var button = new ComponentBuilder()
                 .WithButton("Click to Subscribe or Add Credits", null, ButtonStyle.Link, url: "https://hartsy.ai")
                 .Build();
@@ -246,7 +235,6 @@ namespace Hartsy.Core
             string username = user!.Username;
             Embed? embed = null;
             Dictionary<string, object>? payload = null;
-
             var templates = await _supabaseClient.GetTemplatesAsync();
             if (templates != null && templates.TryGetValue(templateName, out var templateDetails))
             {
@@ -294,7 +282,7 @@ namespace Hartsy.Core
                         {"batchsize", 4},
                         {"donotsave", true},
                         {"model", templateDetails.Checkpoint ?? ""},
-                        {"loras", "an0tha0ne"},
+                        {"loras", "an0tha0ne"}, // change back to get lora from supa
                         {"loraweights", 0.8}, // loraweight ?? 0.9
                         {"width", 1024},
                         {"height", 768},

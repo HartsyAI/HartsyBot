@@ -1,6 +1,5 @@
 ﻿using Discord;
 using Discord.WebSocket;
-using System.Net.Mail;
 
 namespace Hartsy.Core
 {
@@ -14,14 +13,13 @@ namespace Hartsy.Core
         /// <returns>A Task that represents the asynchronous operation of showcasing an image.</returns>
         public static async Task ShowcaseImageAsync(IGuild guild, string imagePath, IUser user)
         {
-            var channels = await guild.GetChannelsAsync();
+            IReadOnlyCollection<IGuildChannel> channels = await guild.GetChannelsAsync();
             if (channels.FirstOrDefault(x => x.Name == "showcase") is not ITextChannel showcaseChannel)
             {
                 Console.WriteLine("Showcase channel not found.");
                 return;
             }
-
-            var components = new ComponentBuilder()
+            MessageComponent components = new ComponentBuilder()
                 .WithButton("Up Vote", customId: "vote:up", style: ButtonStyle.Success, emote: new Emoji("\uD83D\uDC4D")) // 👍
                 .WithButton("Report", customId: "report:admin", style: ButtonStyle.Secondary, emote: new Emoji("\u26A0")) // ⚠
                 .WithButton(" ", customId: $"delete:{user.Id}", style: ButtonStyle.Danger, emote: new Emoji("\uD83D\uDDD1")) // 🗑
@@ -29,11 +27,10 @@ namespace Hartsy.Core
             try
             {
                 // Load the image file as an attachment
-                using var fileStream = new FileStream(imagePath, FileMode.Open);
-                var filename = Path.GetFileName(imagePath);
+                using FileStream fileStream = new(imagePath, FileMode.Open);
+                string filename = Path.GetFileName(imagePath);
                 filename = filename.Replace(":", "_");
-
-                var embed = new EmbedBuilder()
+                Embed embed = new EmbedBuilder()
                     .WithTitle("Showcase Image")
                     .WithDescription($"Submitted by {user.Username}")
                     .WithThumbnailUrl(user.GetAvatarUrl() ?? user.GetDefaultAvatarUrl())
@@ -41,9 +38,8 @@ namespace Hartsy.Core
                     .AddField("Upvotes", "None", true)
                     .WithFooter("Total Votes: 0")
                     .Build();
-
-                var fileAttachment = new FileAttachment(fileStream, filename);
-                var message = await showcaseChannel.SendFileAsync(attachment: fileAttachment, text: null, embed: embed, components: components);
+                FileAttachment fileAttachment = new(fileStream, filename);
+                IUserMessage message = await showcaseChannel.SendFileAsync(attachment: fileAttachment, text: null, embed: embed, components: components);
                 await showcaseChannel.CreateThreadAsync($"Discuss Showcase by {user.Username}", autoArchiveDuration: ThreadArchiveDuration.OneDay, message: message);
             }
             catch (Exception ex)
@@ -65,29 +61,22 @@ namespace Hartsy.Core
         public static async Task UpdateVoteAsync(IMessageChannel channel, ulong messageId, IUser user)
         {
             if (await channel.GetMessageAsync(messageId) is not IUserMessage message) return;
-
-            var embed = message.Embeds.FirstOrDefault();
+            IEmbed? embed = message.Embeds.FirstOrDefault();
             if (embed == null) return;
-
-            var builder = embed.ToEmbedBuilder();
-            var upvotesField = builder.Fields.FirstOrDefault(f => f.Name == "Upvotes");
-
+            EmbedBuilder builder = embed.ToEmbedBuilder();
+            EmbedFieldBuilder? upvotesField = builder.Fields.FirstOrDefault(f => f.Name == "Upvotes");
             List<string> upvotes = upvotesField != null ? upvotesField.Value.ToString()!.Split(separator, 
                 StringSplitOptions.RemoveEmptyEntries).Select(v => v.Trim()).ToList() : [];
-
             upvotes.Remove("None");
             upvotes.RemoveAll(vote => vote == user.Username);
             upvotes.Add(user.Username);
-
             builder.Fields[0].WithIsInline(true).WithValue(string.Join(", ", upvotes));
             builder.WithFooter($"Total Votes: {upvotes.Count(upvote => upvote != "None")}");
-
             await message.ModifyAsync(msg =>
             {
                 msg.Embed = builder.Build();
                 msg.Attachments = null;
             });
-
             // If upvotes reach 5, send to "top-hartists" channel
             if (upvotes.Count(upvote => upvote != "None") == 5)
             {
@@ -103,27 +92,24 @@ namespace Hartsy.Core
         /// <returns></returns>
         private static async Task SendToTopHartists(IGuild guild, IUserMessage message)
         {
-            var channels = await guild.GetChannelsAsync();
+            IReadOnlyCollection<IGuildChannel> channels = await guild.GetChannelsAsync();
             if (channels.FirstOrDefault(x => x.Name == "top-hartists") is not ITextChannel topHartistsChannel)
             {
                 Console.WriteLine("Top-Hartists channel not found.");
                 return;
             }
-
-            var iEmbed = message.Embeds.FirstOrDefault();
+            IEmbed? iEmbed = message.Embeds.FirstOrDefault();
             if (iEmbed != null)
             {
-                var embedBuilder = new EmbedBuilder()
+                Embed embedBuilder = new EmbedBuilder()
                     .WithTitle(iEmbed.Title)
                     .WithDescription(iEmbed.Description)
                     .WithFooter(footer => footer.Text = iEmbed.Footer?.Text)
                     .WithImageUrl(iEmbed.Image?.Url)
                     .WithThumbnailUrl(iEmbed.Thumbnail?.Url)
                     .Build();
-
                 await topHartistsChannel.SendMessageAsync("🌟 A new top artist has been selected! 🌟", embed: embedBuilder);
             }
-
         }
     }
 }

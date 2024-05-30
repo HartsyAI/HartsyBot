@@ -1,11 +1,17 @@
-﻿using System.Text.RegularExpressions;
+﻿using System;
+using System.Text.RegularExpressions;
 using Discord;
 using Discord.Interactions;
+using Discord.Rest;
 using Discord.WebSocket;
+using Hartsy.Core.SupaBase;
+using Hartsy.Core.SupaBase.Models;
+using Microsoft.VisualBasic;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Gif;
 using SixLabors.ImageSharp.Processing;
 using SixLabors.ImageSharp.Processing.Processors.Quantization;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Hartsy.Core
 {
@@ -135,30 +141,25 @@ namespace Hartsy.Core
                 await FollowupAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
                 return;
             }
-            var message = (Context.Interaction as SocketMessageComponent)?.Message;
+            SocketUserMessage? message = (Context.Interaction as SocketMessageComponent)?.Message;
             if (message == null || message.Embeds.Count == 0)
             {
                 Console.WriteLine("Message or embeds are null/empty");
                 await FollowupAsync("Error: Message or embeds are missing.", ephemeral: true);
                 return;
             }
-
-            var embed = message.Embeds.First();
+            Embed embed = message.Embeds.First();
             var (text, description, template) = ParseEmbed(embed);
-
-            var channel = Context.Channel as SocketTextChannel;
-
-            var user = Context.User as SocketGuildUser;
-
-            var userInfo = await _supabaseClient.GetUserByDiscordId(user?.Id.ToString() ?? "");
+            SocketTextChannel? channel = Context.Channel as SocketTextChannel;
+            SocketGuildUser? user = Context.User as SocketGuildUser;
+            Users? userInfo = await _supabaseClient.GetUserByDiscordId(user?.Id.ToString() ?? "");
             if (userInfo == null)
             {
                 Console.WriteLine("userInfo is null - User not found in database.");
                 await Commands.HandleSubscriptionFailure(Context);
                 return;
             }
-
-            var subStatus = userInfo.PlanName;
+            string? subStatus = userInfo.PlanName;
             if (subStatus == null || userInfo.Credit <= 0)
             {
                 Console.WriteLine($"Subscription status or credit issue. Status: {subStatus}, Credits: {userInfo.Credit}");
@@ -167,8 +168,7 @@ namespace Hartsy.Core
             }
             int credits = userInfo.Credit ?? 0;
             await _supabaseClient.UpdateUserCredit(user?.Id.ToString() ?? "", credits - 1);
-
-            var creditEmbed = new EmbedBuilder()
+            Embed creditEmbed = new EmbedBuilder()
                     .WithTitle("Image Generation")
                     .WithDescription($"You have {credits} GPUT. You will have {credits - 1} GPUT after this image is generated.")
                     .AddField("Generate Command", "This command allows you to generate images based on the text and template you provide. " +
@@ -176,7 +176,6 @@ namespace Hartsy.Core
                     .WithColor(Discord.Color.Gold)
                     .WithCurrentTimestamp()
                     .Build();
-
             await FollowupAsync(embed: creditEmbed, ephemeral: true);
             await _commands.GenerateFromTemplate(text, template, channel, user, description);
         }
@@ -187,20 +186,16 @@ namespace Hartsy.Core
         private static (string text, string description, string template) ParseEmbed(IEmbed embed)
         {
             string embedDescription = embed.Description ?? "";
-
             // Regular expression checks
-            var textPattern = @"\*\*Text:\*\*\s*(.+?)\n\n";
-            var descriptionPattern = @"\*\*Extra Description:\*\*\s*(.+?)\n\n";
-            var templatePattern = @"\n\n\*\*Template Used:\*\*\s*(.+?)\n\n";
-
-            var textMatch = Regex.Match(embedDescription, textPattern);
-            var descriptionMatch = Regex.Match(embedDescription, descriptionPattern);
-            var templateMatch = Regex.Match(embedDescription, templatePattern);
-
+            string textPattern = @"\*\*Text:\*\*\s*(.+?)\n\n";
+            string descriptionPattern = @"\*\*Extra Description:\*\*\s*(.+?)\n\n";
+            string templatePattern = @"\n\n\*\*Template Used:\*\*\s*(.+?)\n\n";
+            Match textMatch = Regex.Match(embedDescription, textPattern);
+            Match descriptionMatch = Regex.Match(embedDescription, descriptionPattern);
+            Match templateMatch = Regex.Match(embedDescription, templatePattern);
             string text = textMatch.Groups[1].Value.Trim();
             string description = descriptionMatch.Groups[1].Value.Trim();
             string template = templateMatch.Groups[1].Value.Trim();
-
             return (text, description, template);
         }
 
@@ -224,10 +219,8 @@ namespace Hartsy.Core
 
             await DeferAsync();
             SocketMessageComponent? interaction = Context.Interaction as SocketMessageComponent;
-
             // Delete the original message
             await (interaction?.Message.DeleteAsync()!);
-
             // Respond with a followup message
             await FollowupAsync("Message deleted successfully", ephemeral: true);
         }
@@ -246,7 +239,6 @@ namespace Hartsy.Core
             ISocketMessageChannel channel = Context.Channel;
             SocketMessageComponent? interaction = Context.Interaction as SocketMessageComponent;
             ulong messageId = interaction!.Message.Id;
-
             switch (customId)
             {
                 case "up":
@@ -270,21 +262,18 @@ namespace Hartsy.Core
         public async Task ReportButtonHandler(string userId)
         {
             SocketGuildUser? user = Context.User as SocketGuildUser;
-            var guild = Context.Guild;
-
+            SocketGuild guild = Context.Guild;
             if (IsOnCooldown(user!, "report"))
             {
                 await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
                 return;
             }
-            var message = (Context.Interaction as SocketMessageComponent)?.Message;
-            var GetEmbed = message?.Embeds.FirstOrDefault();
-            var staffChannel = guild.TextChannels.FirstOrDefault(c => c.Name == "staff-chat-🔒");
-
-
+            SocketUserMessage? message = (Context.Interaction as SocketMessageComponent)?.Message;
+            Embed? GetEmbed = message?.Embeds.FirstOrDefault();
+            SocketTextChannel? staffChannel = guild.TextChannels.FirstOrDefault(c => c.Name == "staff-chat-🔒");
             if (message != null && staffChannel != null)
             {
-                var embed = new EmbedBuilder()
+                Embed embed = new EmbedBuilder()
                     .WithTitle("Reported Message")
                     .WithDescription($"A message has been reported by {user!.Mention}. " +
                     $"\n\n<@{userId}> may have created an image that breaks the community rules. A mod needs to look at this ASAP!")
@@ -293,17 +282,14 @@ namespace Hartsy.Core
                     .WithColor(Discord.Color.Red)
                     .WithTimestamp(DateTimeOffset.Now)
                     .Build();
-
                 // Send a detailed report to the staff channel
                 await staffChannel.SendMessageAsync(embed: embed);
-
                 // Disable the button on the reported message
-                var component = new ComponentBuilder()
+                MessageComponent component = new ComponentBuilder()
                     .WithButton("Reported", "report", ButtonStyle.Danger, disabled: true)
                     .Build();
                 await (message as IUserMessage)?.ModifyAsync(msg => msg.Components = component)!;
-
-                var response = new EmbedBuilder()
+                Embed response = new EmbedBuilder()
                     .WithTitle("Message Reported")
                     .WithDescription($"{user.Mention}, Thank you for reporting this message. Our community's safety and integrity are of utmost importance to us.")
                     .AddField("Report Received", "Your report has been successfully submitted to our staff team.")
@@ -313,10 +299,8 @@ namespace Hartsy.Core
                     .WithColor(Discord.Color.Gold)
                     .WithCurrentTimestamp()
                     .Build();
-
                 // Send the embed in the original channel
                 await RespondAsync(embed: response, ephemeral: true);
-
             }
             else
             {
@@ -338,14 +322,13 @@ namespace Hartsy.Core
             }
             if (Context.User is SocketGuildUser user)
             {
-                var userInfo = await _supabaseClient.GetUserByDiscordId(user.Id.ToString());
+                Users? userInfo = await _supabaseClient.GetUserByDiscordId(user.Id.ToString());
                 if (userInfo == null)
                 {
-                    var components = new ComponentBuilder()
+                    MessageComponent components = new ComponentBuilder()
                     .WithButton("Link Account", style: ButtonStyle.Link, url: "https://hartsy.ai")
                     .Build();
-
-                    var embed = new EmbedBuilder()
+                    Embed embed = new EmbedBuilder()
                         .WithTitle("Link Your Hartsy.AI Account")
                         .WithDescription($"{user.Mention}, you have not linked your Discord account with your Hartsy.AI account. Make a FREE account " +
                                                             "and log into Hartsy.AI using your Discord credentials. If you have already done that and are still having issues" +
@@ -353,18 +336,15 @@ namespace Hartsy.Core
                         .WithColor(Discord.Color.Blue)
                         .WithTimestamp(DateTimeOffset.Now)
                         .Build();
-
                     await user.SendMessageAsync(embed: embed, components: components);
                     return;
                 }
-
-                var subStatus = userInfo.PlanName;
+                string? subStatus = userInfo.PlanName;
                 if (subStatus == null)
                 {
                     await RespondAsync("Error: Subscription status not found.", ephemeral: true);
                     return;
                 }
-
                 try
                 {
                     string[] splitCustomId = customId.Split(":");
@@ -379,65 +359,56 @@ namespace Hartsy.Core
                             .AddOption("Image 2", "image_1")
                             .AddOption("Image 3", "image_2")
                             .AddOption("Image 4", "image_3");
-
                     if (type == "i2i")
                     {
                         selectMenu.WithCustomId($"select_image:i2i:{userId}:{messageId}");
-                        var selectBuilder = new ComponentBuilder()
+                        ComponentBuilder selectBuilder = new ComponentBuilder()
                             .WithSelectMenu(selectMenu);
-                        var itiEmbed = new EmbedBuilder()
+                        EmbedBuilder itiEmbed = new EmbedBuilder()
                             .WithTitle("Select Image")
                             .WithDescription("Choose an image and we will generate 4 new images based off of that.")
                             .WithColor(Discord.Color.Purple)
                             .WithCurrentTimestamp();
-
                         await RespondAsync(embed: itiEmbed.Build(), components: selectBuilder.Build(), ephemeral: true);
-
                         return;
                     }
                     else if (type == "save")
                     {
                         selectMenu.WithCustomId($"select_image:add:{userId}:{messageId}");
-                        var selectBuilder = new ComponentBuilder()
+                        ComponentBuilder selectBuilder = new ComponentBuilder()
                             .WithSelectMenu(selectMenu);
-                        var saveEmbed = new EmbedBuilder()
+                        EmbedBuilder saveEmbed = new EmbedBuilder()
                             .WithTitle("Select Image")
                             .WithDescription("Select the image you wish to save to the gallery")
                             .WithColor(Discord.Color.Blue)
                             .WithCurrentTimestamp();
-
                         await RespondAsync(embed: saveEmbed.Build(), components: selectBuilder.Build(), ephemeral: true);
-
                         return;
                     }
                     else if (type == "gif")
                     {
                         selectMenu.WithCustomId($"select_image:gif:{userId}:{messageId}");
-                        var selectBuilder = new ComponentBuilder()
+                        ComponentBuilder selectBuilder = new ComponentBuilder()
                             .WithSelectMenu(selectMenu);
-                        var gifEmbed = new EmbedBuilder()
+                        EmbedBuilder gifEmbed = new EmbedBuilder()
                             .WithTitle("Select Images")
                             .WithDescription("Select the images you wish to create a GIF from")
                             .WithColor(Discord.Color.Green)
                             .WithCurrentTimestamp();
-
                         await RespondAsync(embed: gifEmbed.Build(), components: selectBuilder.Build(), ephemeral: true);
-
                         return;
                     }
                     else if (type == "showcase")
                     {
                         selectMenu.WithCustomId($"select_image:showcase:{userId}:{messageId}");
-                        var selectBuilder = new ComponentBuilder()
+                        ComponentBuilder selectBuilder = new ComponentBuilder()
                             .WithSelectMenu(selectMenu);
-                        var showcaseEmbed = new EmbedBuilder()
+                        EmbedBuilder showcaseEmbed = new EmbedBuilder()
                             .WithTitle("Select Image for Showcase")
                             .WithDescription("Select an image to add to the #showcase channel. Other users will be able to vote on your image.")
                             .WithColor(Discord.Color.Blue)
                             .WithCurrentTimestamp();
-
                         await RespondAsync(embed: showcaseEmbed.Build(), components: selectBuilder.Build(), ephemeral: true);
-
                         return;
                     }
                 }
@@ -458,21 +429,17 @@ namespace Hartsy.Core
 #pragma warning restore IDE0051 // Remove unused private members
         {
             await DeferAsync();
-            var selectedValue = selections.FirstOrDefault();
-
+            string? selectedValue = selections.FirstOrDefault();
             if (!string.IsNullOrEmpty(selectedValue))
             {
                 string[] parts = customId.Split(':');
                 if (parts.Length >= 4) return;
-
                 string actionType = parts[0]; // Should give "i2i" or "add"
                 string userid = parts[1]; // Should give the userId part
                 string messageId = parts[2]; // Should give the messageId part
-
                 SocketMessageComponent? interaction = Context.Interaction as SocketMessageComponent;
                 string username = interaction!.User.Username;
                 string userId = interaction.User.Id.ToString();
-
                 if (userId != userid)
                 {
                     EmbedBuilder errorEmbed = new EmbedBuilder()
@@ -480,7 +447,6 @@ namespace Hartsy.Core
                         .WithDescription("Error: You cannot select another user's image.")
                         .WithColor(Discord.Color.Red)
                         .WithCurrentTimestamp();
-
                     await FollowupAsync(embed: errorEmbed.Build(), ephemeral: true);
                     return;
                 }
@@ -492,7 +458,6 @@ namespace Hartsy.Core
                     // Construct the full path
                     directoryPath = Path.Combine(Directory.GetCurrentDirectory(), $"../../../images/{username}/{messageId}");
                     filePath = Path.Combine(directoryPath, $"{messageId}:{selectedValue}.jpeg");
-
                     // Ensure the directory exists
                     if (!Directory.Exists(directoryPath))
                     {
@@ -501,7 +466,6 @@ namespace Hartsy.Core
                         Directory.CreateDirectory(directoryPath);
                         Console.WriteLine("Directory created.");
                     }
-
                     // Check if the file exists
                     if (!File.Exists(filePath))
                     {
@@ -509,7 +473,6 @@ namespace Hartsy.Core
                         await FollowupAsync("Error: Image not found.", ephemeral: true);
                         return;  // Exit if the file does not exist
                     }
-
                     // Proceed with reading the file
                     initimage = Convert.ToBase64String(File.ReadAllBytes(filePath));
                 }
@@ -523,11 +486,10 @@ namespace Hartsy.Core
                     Console.WriteLine($"An unexpected error occurred: {ex.Message}");
                     await FollowupAsync("An unexpected error occurred while processing your request.", ephemeral: true);
                 }
-
                 SocketTextChannel? channel = Context.Channel as SocketTextChannel;
                 SocketGuildUser? user = Context.User as SocketGuildUser;
-                SupabaseClient.Users? supaUser = await _supabaseClient.GetUserByDiscordId(user!.Id.ToString());
-                var subStatus = supaUser!.PlanName;
+                Users? supaUser = await _supabaseClient.GetUserByDiscordId(user!.Id.ToString());
+                string? subStatus = supaUser!.PlanName;
                 if (subStatus == null || supaUser.Credit <= 0)
                 {
                     Console.WriteLine($"Subscription status or credit issue. Status: {subStatus}, Credits: {supaUser.Credit}");
@@ -535,7 +497,7 @@ namespace Hartsy.Core
                     return;
                 }
                 int credits = supaUser.Credit ?? 0;
-                var creditEmbed = new EmbedBuilder()
+                Embed creditEmbed = new EmbedBuilder()
                                 .WithTitle("Image Generation")
                                 .WithDescription($"You have {credits} GPUT. You will have {credits - 1} GPUT after this image is generated.")
                                 .AddField("Generate Command", "This command allows you to generate images based on the text and template you provide. " +
@@ -543,7 +505,6 @@ namespace Hartsy.Core
                                 .WithColor(Discord.Color.Gold)
                                 .WithCurrentTimestamp()
                                 .Build();
-
                 if (File.Exists(filePath))
                 {
                     if (actionType == "i2i")
@@ -551,7 +512,6 @@ namespace Hartsy.Core
                         IUserMessage? message = await Context.Channel.GetMessageAsync(Convert.ToUInt64(messageId)) as IUserMessage;
                         IEmbed embed = message!.Embeds.First();
                         var (text, description, template) = ParseEmbed(embed);
-
                         await FollowupAsync(embed: creditEmbed, ephemeral: true);
                         await _commands.GenerateFromTemplate(text, template, channel, user, description, initimage);
                         await _supabaseClient.UpdateUserCredit(user.Id.ToString(), credits - 1);
@@ -564,12 +524,11 @@ namespace Hartsy.Core
                         if (url != null)
                         {
                             await _supabaseClient.AddImage(supaUserId!, url);
-                            var embed = new EmbedBuilder()
+                            EmbedBuilder embed = new EmbedBuilder()
                                 .WithTitle("Image Saved Successfully")
                                 .WithDescription("Your image has been added to your gallery. You can go to [Hartsy.ai](https://hartsy.ai) to view and download.")
                                 .WithColor(Discord.Color.Green)
                                 .WithCurrentTimestamp();
-
                             await FollowupAsync(embed: embed.Build(), ephemeral: true);
                         }
                         else
@@ -584,7 +543,7 @@ namespace Hartsy.Core
                     }
                     else if (actionType == "gif")
                     {
-                        var payload = new Dictionary<string, object>
+                        Dictionary<string, object> payload = new()
                         {
                             {"prompt", "clear vibrant text"},
                             {"negativeprompt", "blurry"},
@@ -615,27 +574,24 @@ namespace Hartsy.Core
                             {"video_min_cfg", 1},
                             {"video_motion_bucket", 127},
                         };
-                        var processingMessage = await Context.Channel.SendMessageAsync("Starting GIF generation...");
+                        RestUserMessage processingMessage = await Context.Channel.SendMessageAsync("Starting GIF generation...");
                         EmbedBuilder updatedEmbed = new EmbedBuilder().WithTitle("GIF Generation in Progress...");
-
-                        await foreach (var (base64String, isFinal, ETR) in _stableSwarmAPI.CreateGifAsync(payload, username, processingMessage.Id))
+                        await foreach (var (base64String, isFinal, ETR) in _stableSwarmAPI.CreateGifAsync(payload))
                         {
                             try
                             {
                                 // Convert the base64 string to a byte array
-                                var imageData = Convert.FromBase64String(base64String);
-                                using var imageStream = new MemoryStream(imageData);
-                                MemoryStream embedStream = new MemoryStream();
+                                byte[] imageData = Convert.FromBase64String(base64String);
+                                using MemoryStream imageStream = new(imageData);
+                                MemoryStream embedStream = new();
                                 imageStream.Position = 0; // Ensure the stream position is at the beginning for all checks
                                 string suffix = "";
-
                                 // Read the necessary header bytes for the largest expected header
                                 byte[] header = new byte[12];
                                 if (imageStream.Length >= header.Length)
                                 {
                                     imageStream.Read(header, 0, header.Length);
                                     imageStream.Position = 0; // Reset position if further operations are needed on the stream
-
                                     // Check if GIF
                                     if (header[0] == 0x47 && header[1] == 0x49 && header[2] == 0x46)
                                     {
@@ -650,7 +606,8 @@ namespace Hartsy.Core
                                         Console.WriteLine("JPEG generated");
                                         embedStream = imageStream;
                                         // resize the image to 1024x768
-                                        using var image = SixLabors.ImageSharp.Image.Load(imageData);
+                                        // TODO: Add proper using statement for SixLabors.ImageSharp
+                                        using SixLabors.ImageSharp.Image image = SixLabors.ImageSharp.Image.Load(imageData);
                                         image.Mutate(i => i.Resize(1024, 768));
                                         embedStream = new MemoryStream();
                                         image.SaveAsJpeg(embedStream);
@@ -663,7 +620,7 @@ namespace Hartsy.Core
                                         try
                                         {
                                             // Load the WebP image directly from the byte array
-                                            using (var image = SixLabors.ImageSharp.Image.Load(imageData))
+                                            using (SixLabors.ImageSharp.Image image = SixLabors.ImageSharp.Image.Load(imageData))
                                             {
                                                 // Triple the dimensions of the image
                                                 int newWidth = image.Width * 3;
@@ -671,7 +628,7 @@ namespace Hartsy.Core
                                                 // Resize the image
                                                 image.Mutate(x => x.Resize(newWidth, newHeight));
                                                 // Configure the GIF encoder to handle animation if necessary
-                                                var encoder = new GifEncoder()
+                                                GifEncoder encoder = new()
                                                 {
                                                     ColorTableMode = GifColorTableMode.Global,  // Use global color table for better compression
                                                     Quantizer = new WebSafePaletteQuantizer(),  // Reduce the number of colors if necessary
@@ -687,7 +644,7 @@ namespace Hartsy.Core
                                         }
                                     }
                                     // Use the MemoryStream for attachment and message updating
-                                    FileAttachment file = new FileAttachment(embedStream, $"new_image.{suffix}");
+                                    FileAttachment file = new(embedStream, $"new_image.{suffix}");
                                     updatedEmbed.WithImageUrl($"attachment://new_image.{suffix}");
                                     updatedEmbed.WithColor(Discord.Color.Red);
                                     updatedEmbed.WithDescription($"Estimated Time Remaining: {ETR}");

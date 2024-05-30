@@ -1,5 +1,6 @@
 ﻿using Discord;
 using Discord.WebSocket;
+using Hartsy.Core.SupaBase;
 
 namespace Hartsy.Core
 {

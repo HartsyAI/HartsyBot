@@ -3,34 +3,59 @@ using Discord;
 using Discord.WebSocket;
 using Discord.Rest;
 using Newtonsoft.Json.Linq;
+using System.Net.Http;
+using System.IO;
+using Hartsy.Core.SupaBase;
+using Hartsy.Core.SupaBase.Models;
 
 namespace Hartsy.Core
 {
-    public class AdminCommands(SupabaseClient supabaseClient) : InteractionModuleBase<SocketInteractionContext>
+    public class AdminCommands(SupabaseClient supabaseClient, HttpClient httpClient) : InteractionModuleBase<SocketInteractionContext>
     {
         private readonly SupabaseClient _supabaseClient = supabaseClient;
+        private readonly HttpClient _httpClient = httpClient;
 
         /// <summary>Initiates adding a new template, accessible only by users with the "HARTSY Staff" role. Displays a modal for entering template details.</summary>
         [SlashCommand("add-template", "Add a new template")]
         [RequireRole("HARTSY Staff")]
-        public async Task AddTemplateCommand()
+        public async Task AddTemplateCommand([Summary("cover_image", "The cover image for the template")] IAttachment attachment)
         {
             if (Context.User is not SocketGuildUser user)
             {
                 await RespondAsync("User not found.", ephemeral: true);
                 return;
             }
+            if (attachment == null)
+            {
+                await RespondAsync("Please attach a cover image for the template.", ephemeral: true);
+                return;
+            }
+            string filename = attachment.Filename.ToLower();
+            if (!(filename.EndsWith(".png") || filename.EndsWith(".jpg") || filename.EndsWith(".jpeg")))
+            {
+                await RespondAsync("Please upload a valid image file (png, jpg, jpeg).", ephemeral: true);
+                return;
+            }
             try
-            { 
-                // Pre-fill the modal with placeholder text
-                var addTemplateModal = new AddTemplateModal
+            {
+                Stream imageStream = await _httpClient.GetStreamAsync(attachment.Url);
+                using MemoryStream memoryStream = new();
+                await imageStream.CopyToAsync(memoryStream);
+                string tempFilePath = Path.GetTempFileName();
+                await File.WriteAllBytesAsync(tempFilePath, memoryStream.ToArray());
+                string imageUrl = await _supabaseClient.UploadImage(user.Id.ToString(), tempFilePath);
+                File.Delete(tempFilePath);
+                if (imageUrl == null)
+                {
+                    await RespondAsync("Failed to upload image.", ephemeral: true);
+                    return;
+                }
+                AddTemplateModal addTemplateModal = new()
                 {
                     Name = "Enter the name of the template",
                     Description = "Enter description here",
                     Positive = "(\"__TEXT_REPLACE__\":1.5) (text logo:1.3), "
                 };
-
-                // Respond with the modal
                 await RespondWithModalAsync("add_template_modal", addTemplateModal);
             }
             catch (Exception ex)
@@ -40,17 +65,16 @@ namespace Hartsy.Core
             }
         }
 
-        /// <summary>Handles the submission of the add template modal and saves the new template details to the database.</summary>
-        /// <param name="addTemplateModal">The modal containing the template details.</param>
-        [ModalInteraction("add_template_modal")]
+    /// <summary>Handles the submission of the add template modal and saves the new template details to the database.</summary>
+    /// <param name="addTemplateModal">The modal containing the template details.</param>
+    [ModalInteraction("add_template_modal")]
         public async Task OnTemplateModalSubmit(AddTemplateModal addTemplateModal)
         {
             // Extract the values from the modal
             string name = addTemplateModal.Name ?? "Template Name";
             string description = addTemplateModal.Description ?? "Template description";
             string positive = addTemplateModal.Positive ?? "Positive prompt";
-
-            SupabaseClient.Template newTemplate = new()
+            Template newTemplate = new()
             {
                 Prompt = "not used",
                 Name = name,
@@ -108,30 +132,26 @@ namespace Hartsy.Core
             {
                 ITextChannel? rulesChannel = Context.Guild.TextChannels.FirstOrDefault(x => x.Name == "rules");
                 rulesChannel ??= await Context.Guild.CreateTextChannelAsync("rules");
-
                 // Initialize default text
                 string defaultDescription = "Default description text",
                     defaultServerRules = "Default server rules text",
                     defaultCodeOfConduct = "Default code of conduct text",
                     defaultOurStory = "Default our story text",
                     defaultButtonFunction = "Default button function description text";
-
                 // Extract text from the last message if available
-                var messages = await rulesChannel.GetMessagesAsync(1).FlattenAsync();
-                var lastMessage = messages.FirstOrDefault();
+                IEnumerable<IMessage> messages = await rulesChannel.GetMessagesAsync(1).FlattenAsync();
+                IMessage? lastMessage = messages.FirstOrDefault();
                 if (lastMessage != null && lastMessage.Embeds.Count != 0)
                 {
-                    var embed = lastMessage.Embeds.First();
+                    IEmbed embed = lastMessage.Embeds.First();
                     defaultDescription = embed.Description ?? defaultDescription;
                     defaultServerRules = embed.Fields.Length > 0 ? embed.Fields[0].Value : defaultServerRules;
                     defaultCodeOfConduct = embed.Fields.Length > 1 ? embed.Fields[1].Value : defaultCodeOfConduct;
                     defaultOurStory = embed.Fields.Length > 2 ? embed.Fields[2].Value : defaultOurStory;
                     defaultButtonFunction = embed.Fields.Length > 3 ? embed.Fields[3].Value : defaultButtonFunction;
                 }
-
                 // Prepare the modal with default text
-                var rulesModal = new RulesModal(defaultDescription, defaultServerRules, defaultCodeOfConduct, defaultOurStory, defaultButtonFunction);
-
+                RulesModal rulesModal = new(defaultDescription, defaultServerRules, defaultCodeOfConduct, defaultOurStory, defaultButtonFunction);
                 // Respond with the modal
                 await RespondWithModalAsync<RulesModal>("setup_rules_modal", rulesModal);
             }
@@ -151,17 +171,15 @@ namespace Hartsy.Core
             try
             {
                 // Extract the data from the modal
-                var description = modal.Description;
-                var server_rules = modal.Server_rules;
-                var codeOfConduct = modal.CodeOfConduct;
-                var ourStory = modal.OurStory;
-                var ButtonFunction = modal.ButtonFunction;
-
-                var imagePath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "images", "server_rules.png");
-                var stream = new FileStream(imagePath, FileMode.Open);
-
+                string description = modal.Description ?? "";
+                string server_rules = modal.Server_rules ?? "";
+                string codeOfConduct = modal.CodeOfConduct?? "";
+                string ourStory = modal.OurStory ?? "";
+                string ButtonFunction = modal.ButtonFunction ?? "";
+                string imagePath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "images", "server_rules.png");
+                FileStream stream = new(imagePath, FileMode.Open);
                 // Construct the embed with fields from the modal
-                var embed = new EmbedBuilder()
+                Embed embed = new EmbedBuilder()
                     .WithTitle("Welcome to the Hartsy.AI Discord Server!")
                     .WithDescription(modal.Description)
                     .AddField("Server Rules", modal.Server_rules)
@@ -173,27 +191,23 @@ namespace Hartsy.Core
                     .WithImageUrl("attachment://server_rules.png")
                     .WithFooter("Click the buttons to add roles")
                     .Build();
-
                 // Find the 'rules' channel
-                var rulesChannel = Context.Guild.TextChannels.FirstOrDefault(x => x.Name == "rules");
+                SocketTextChannel? rulesChannel = Context.Guild.TextChannels.FirstOrDefault(x => x.Name == "rules");
                 if (rulesChannel != null)
                 {
                     // Check for the last message in the 'rules' channel
-                    var messages = await rulesChannel.GetMessagesAsync(1).FlattenAsync();
+                    IEnumerable<IMessage> messages = await rulesChannel.GetMessagesAsync(1).FlattenAsync();
                     var lastMessage = messages.FirstOrDefault();
-
                     // If there's an existing message, delete it
                     if (lastMessage != null)
                     {
                         await lastMessage.DeleteAsync();
                     }
-
                     // Define the buttons
-                    var buttonComponent = new ComponentBuilder()
+                    MessageComponent buttonComponent = new ComponentBuilder()
                         .WithButton("I Read the Rules", "read_rules", ButtonStyle.Success)
                         .WithButton("Don't Notify Me", "notify_me", ButtonStyle.Primary)
                         .Build();
-
                     // Send the new embed with buttons to the 'rules' channel
                     await rulesChannel.SendFileAsync(stream, "server_rules.png", text: null, embed: embed, components: buttonComponent);
                     await FollowupAsync("Rules have been updated!", ephemeral: true);
@@ -253,7 +267,5 @@ namespace Hartsy.Core
                 ButtonFunction = buttonFunction;
             }
         }
-
     }
 }
-

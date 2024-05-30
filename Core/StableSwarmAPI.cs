@@ -307,10 +307,9 @@ namespace Hartsy.Core
         {
             try
             {
-                var content = new StringContent(jsonData.ToString(), Encoding.UTF8, "application/json");
-                using var response = await Client.PostAsync(url, content);
+                StringContent content = new(jsonData.ToString(), Encoding.UTF8, "application/json");
+                using HttpResponseMessage response = await Client.PostAsync(url, content);
                 string result = await response.Content.ReadAsStringAsync();
-
                 if (!response.IsSuccessStatusCode)
                 {
                     Console.WriteLine($"API Request Failed: {response.StatusCode} - {result}");
@@ -331,34 +330,28 @@ namespace Hartsy.Core
         /// <param name="messageId">The message identifier associated with the request.</param>
         /// <param name="payload">The dictionary containing the necessary data and settings for GIF generation.</param>
         /// <returns>A task that represents the asynchronous operation, yielding the generated GIF image.</returns>
-        public async IAsyncEnumerable<(string Base64, bool IsFinal, string ETR)> CreateGifAsync(Dictionary<string, object> payload, string username, ulong messageId)
+        public async IAsyncEnumerable<(string Base64, bool IsFinal, string ETR)> CreateGifAsync(Dictionary<string, object> payload)
         {
             using var webSocket = new ClientWebSocket();
             await EnsureWebSocketConnectionAsync(webSocket);
             payload["session_id"] = await GetSession();
             await SendRequestAsync(webSocket, payload);
-
-            var responseBuffer = new ArraySegment<byte>(new byte[8192]);
-            StringBuilder stringBuilder = new StringBuilder();
+            ArraySegment<byte> responseBuffer = new(new byte[8192]);
+            StringBuilder stringBuilder = new();
             DateTime startTime = DateTime.UtcNow;
             double lastPercent = 0;
             TimeSpan estimatedTimeRemaining = TimeSpan.Zero;
-
-
             while (webSocket.State == WebSocketState.Open)
             {
                 stringBuilder.Clear();
                 WebSocketReceiveResult result = await ReceiveMessage(webSocket, stringBuilder, responseBuffer);
-
                 if (result.MessageType == WebSocketMessageType.Close)
                     break;
-
                 string jsonString = stringBuilder.ToString();
                 string logString = ReplaceBase64(jsonString); // Reduces log size by replacing base64 content
                 Console.WriteLine("Response JSON (excluding base64 data): " + logString);
-                var responseData = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonString);
+                Dictionary<string, object>? responseData = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonString);
                 bool isFinal = false;
-
                 foreach (var kvp in responseData!)
                 { 
                     if (responseData != null)
@@ -375,7 +368,6 @@ namespace Hartsy.Core
                                 string base64 = await RemovePrefix(base64WithPrefix);
                                 yield return (base64, isFinal, estimatedTimeRemaining.ToString(@"hh\:mm\:ss"));
                             }
-
                         }
                         if (responseData.TryGetValue("image", out object? value))
                         {
@@ -390,9 +382,9 @@ namespace Hartsy.Core
                             }
                             yield return (base64, isFinal, estimatedTimeRemaining.ToString(@"hh\:mm\:ss"));
                         }
-                        if (responseData.TryGetValue("gen_progress", out object progressData))
+                        if (responseData.TryGetValue("gen_progress", out object? progressData))
                         {
-                            var progressDict = progressData as JObject;
+                            JObject? progressDict = progressData as JObject;
                             double overallPercent = (double)progressDict["overall_percent"];
                             double currentPercent = (double)progressDict["current_percent"];
                             // Reset start time until progress begins
@@ -402,13 +394,11 @@ namespace Hartsy.Core
                                 lastPercent = 0;
                                 continue;  // Skip until progress starts
                             }
-
                             if (currentPercent > lastPercent)
                             {
                                 TimeSpan timeElapsed = DateTime.UtcNow - startTime;
                                 double percentComplete = currentPercent;
                                 double totalEstimatedTime = timeElapsed.TotalSeconds / percentComplete;
-
                                 totalEstimatedTime = Math.Min(totalEstimatedTime, 24 * 60 * 60); // Cap at 24 hours
                                 estimatedTimeRemaining = TimeSpan.FromSeconds((1 - percentComplete) * totalEstimatedTime);
                                 lastPercent = currentPercent;
