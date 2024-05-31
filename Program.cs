@@ -73,7 +73,7 @@ namespace HartsyBot
                     GatewayIntents = GatewayIntents.All,
                     LogLevel = LogSeverity.Debug
                 }))
-                .AddSingleton<InteractionService>()
+                .AddSingleton(p => new InteractionService(p.GetRequiredService<DiscordSocketClient>()))
                 .AddSingleton<InteractionHandlers>()
                 .AddSingleton<TemplateAutocompleteHandler>()
                 .AddSingleton<SupabaseClient>()
