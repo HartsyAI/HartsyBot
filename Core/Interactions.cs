@@ -1,23 +1,23 @@
-﻿using System;
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using Discord;
 using Discord.Interactions;
 using Discord.Rest;
 using Discord.WebSocket;
 using Hartsy.Core.SupaBase;
 using Hartsy.Core.SupaBase.Models;
-using Microsoft.VisualBasic;
+using Hartsy.Core.Commands;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Gif;
 using SixLabors.ImageSharp.Processing;
 using SixLabors.ImageSharp.Processing.Processors.Quantization;
-using static System.Runtime.InteropServices.JavaScript.JSType;
+using System.Net.Http;
+using System.Net.Mail;
 
 namespace Hartsy.Core
 {
-    public class InteractionHandlers(Commands commands, SupabaseClient supabaseClient, StableSwarmAPI stableSwarmAPI) : InteractionModuleBase<SocketInteractionContext>
+    public class InteractionHandlers(UserCommands commands, SupabaseClient supabaseClient, StableSwarmAPI stableSwarmAPI) : InteractionModuleBase<SocketInteractionContext>
     {
-        private readonly Commands _commands = commands;
+        private readonly UserCommands _commands = commands;
         private readonly SupabaseClient _supabaseClient = supabaseClient;
         private readonly StableSwarmAPI _stableSwarmAPI = stableSwarmAPI;
         private static readonly Dictionary<(ulong, string), DateTime> _lastInteracted = [];
@@ -46,19 +46,16 @@ namespace Hartsy.Core
         [ComponentInteraction("read_rules")]
         public async Task ReadRulesButtonHandler()
         {
-            var memberRole = Context.Guild.Roles.FirstOrDefault(r => r.Name == "Member");
-            var announcementRole = Context.Guild.Roles.FirstOrDefault(r => r.Name == "Announcement");
-            var user = (SocketGuildUser)Context.User;
-
+            SocketRole? memberRole = Context.Guild.Roles.FirstOrDefault(r => r.Name == "Member");
+            SocketRole? announcementRole = Context.Guild.Roles.FirstOrDefault(r => r.Name == "Announcement");
+            SocketGuildUser user = (SocketGuildUser)Context.User;
             if (IsOnCooldown(Context.User, "read_rules"))
             {
                 await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
                 return;
             }
-
-            var rolesToAdd = new List<IRole>();
-            var rolesToRemove = new List<IRole>();
-
+            List<IRole> rolesToAdd = [];
+            List<IRole> rolesToRemove = [];
             if (memberRole != null)
             {
                 if (!user.Roles.Contains(memberRole))
@@ -66,7 +63,6 @@ namespace Hartsy.Core
                 else
                     rolesToRemove.Add(memberRole);
             }
-
             if (announcementRole != null)
             {
                 if (!user.Roles.Contains(announcementRole))
@@ -74,12 +70,10 @@ namespace Hartsy.Core
                 else
                     rolesToRemove.Add(announcementRole);
             }
-
             if (rolesToAdd.Count != 0)
             {
                 await user.AddRolesAsync(rolesToAdd);
             }
-
             if (rolesToRemove.Count != 0)
             {
                 await user.RemoveRolesAsync(rolesToRemove);
@@ -94,7 +88,6 @@ namespace Hartsy.Core
                 response += $"The {string.Join(", ", rolesToRemove.Select(r => r.Name))} role(s) have been removed from you!";
             }
             await RespondAsync(response, ephemeral: true);
-
             // TODO: Add a check if the user has linked their discord account with their Hartsy.AI account and if they are a subscriber
         }
 
@@ -103,8 +96,8 @@ namespace Hartsy.Core
         [ComponentInteraction("notify_me")]
         public async Task NotifyMeButtonHandler()
         {
-            var role = Context.Guild.Roles.FirstOrDefault(r => r.Name == "Announcement");
-            var user = (SocketGuildUser)Context.User;
+            SocketRole role = Context.Guild.Roles.FirstOrDefault(r => r.Name == "Announcement");
+            SocketGuildUser user = (SocketGuildUser)Context.User;
             if (IsOnCooldown(Context.User, "notify_me"))
             {
                 await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
@@ -135,7 +128,6 @@ namespace Hartsy.Core
                 await FollowupAsync("Error: You cannot regenerate another users image.", ephemeral: true);
                 return;
             }
-
             if (IsOnCooldown(Context.User, "regenerate"))
             {
                 await FollowupAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
@@ -156,14 +148,17 @@ namespace Hartsy.Core
             if (userInfo == null)
             {
                 Console.WriteLine("userInfo is null - User not found in database.");
-                await Commands.HandleSubscriptionFailure(Context);
+                await UserCommands.HandleSubscriptionFailure(Context);
+                // TODO: Move HandleSubscriptionFailure to a shared helper method
                 return;
             }
             string? subStatus = userInfo.PlanName;
             if (subStatus == null || userInfo.Credit <= 0)
             {
                 Console.WriteLine($"Subscription status or credit issue. Status: {subStatus}, Credits: {userInfo.Credit}");
-                await Commands.HandleSubscriptionFailure(Context);
+                await UserCommands.HandleSubscriptionFailure(Context);
+                // TODO: Move HandleSubscriptionFailure to a shared helper method
+
                 return;
             }
             int credits = userInfo.Credit ?? 0;
@@ -493,7 +488,9 @@ namespace Hartsy.Core
                 if (subStatus == null || supaUser.Credit <= 0)
                 {
                     Console.WriteLine($"Subscription status or credit issue. Status: {subStatus}, Credits: {supaUser.Credit}");
-                    await Commands.HandleSubscriptionFailure(Context);
+                    await UserCommands.HandleSubscriptionFailure(Context);
+                    // TODO: Move HandleSubscriptionFailure to a shared helper method
+
                     return;
                 }
                 int credits = supaUser.Credit ?? 0;

@@ -1,19 +1,13 @@
 ﻿using Discord.Interactions;
 using Discord;
 using Discord.WebSocket;
-using Discord.Rest;
-using Newtonsoft.Json.Linq;
-using System.Net.Http;
-using System.IO;
 using Hartsy.Core.SupaBase;
 using Hartsy.Core.SupaBase.Models;
 
-namespace Hartsy.Core
+namespace Hartsy.Core.Commands
 {
-    public class AdminCommands(SupabaseClient supabaseClient, HttpClient httpClient) : InteractionModuleBase<SocketInteractionContext>
+    public class AdminCommands(SupabaseClient supabaseClient, HttpClient httpClient) : Commands(supabaseClient, httpClient)
     {
-        private readonly SupabaseClient _supabaseClient = supabaseClient;
-        private readonly HttpClient _httpClient = httpClient;
 
         /// <summary>Initiates adding a new template, accessible only by users with the "HARTSY Staff" role. Displays a modal for entering template details.</summary>
         [SlashCommand("add-template", "Add a new template")]
@@ -39,12 +33,7 @@ namespace Hartsy.Core
             try
             {
                 Stream imageStream = await _httpClient.GetStreamAsync(attachment.Url);
-                using MemoryStream memoryStream = new();
-                await imageStream.CopyToAsync(memoryStream);
-                string tempFilePath = Path.GetTempFileName();
-                await File.WriteAllBytesAsync(tempFilePath, memoryStream.ToArray());
-                string imageUrl = await _supabaseClient.UploadImage(user.Id.ToString(), tempFilePath);
-                File.Delete(tempFilePath);
+                string? imageUrl = await UploadImage(user.Id.ToString(), filename, imageStream);
                 if (imageUrl == null)
                 {
                     await RespondAsync("Failed to upload image.", ephemeral: true);
@@ -65,9 +54,9 @@ namespace Hartsy.Core
             }
         }
 
-    /// <summary>Handles the submission of the add template modal and saves the new template details to the database.</summary>
-    /// <param name="addTemplateModal">The modal containing the template details.</param>
-    [ModalInteraction("add_template_modal")]
+        /// <summary>Handles the submission of the add template modal and saves the new template details to the database.</summary>
+        /// <param name="addTemplateModal">The modal containing the template details.</param>
+        [ModalInteraction("add_template_modal")]
         public async Task OnTemplateModalSubmit(AddTemplateModal addTemplateModal)
         {
             // Extract the values from the modal
@@ -153,7 +142,7 @@ namespace Hartsy.Core
                 // Prepare the modal with default text
                 RulesModal rulesModal = new(defaultDescription, defaultServerRules, defaultCodeOfConduct, defaultOurStory, defaultButtonFunction);
                 // Respond with the modal
-                await RespondWithModalAsync<RulesModal>("setup_rules_modal", rulesModal);
+                await RespondWithModalAsync("setup_rules_modal", rulesModal);
             }
             catch (Exception ex)
             {
@@ -173,7 +162,7 @@ namespace Hartsy.Core
                 // Extract the data from the modal
                 string description = modal.Description ?? "";
                 string server_rules = modal.Server_rules ?? "";
-                string codeOfConduct = modal.CodeOfConduct?? "";
+                string codeOfConduct = modal.CodeOfConduct ?? "";
                 string ourStory = modal.OurStory ?? "";
                 string ButtonFunction = modal.ButtonFunction ?? "";
                 string imagePath = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "images", "server_rules.png");
