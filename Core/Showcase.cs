@@ -63,6 +63,19 @@ namespace Hartsy.Core
             if (await channel.GetMessageAsync(messageId) is not IUserMessage message) return;
             IEmbed? embed = message.Embeds.FirstOrDefault();
             if (embed == null) return;
+            // Download the existing image to a temp file
+            string? imageUrl = embed.Image?.Url;
+            if (string.IsNullOrEmpty(imageUrl)) return;
+            using HttpClient httpClient = new();
+            Stream imageStream = await httpClient.GetStreamAsync(imageUrl);
+            string tempFilePath = Path.GetTempFileName();
+            // Remove query parameters to get the correct file extension
+            string fileExtension = Path.GetExtension(new Uri(imageUrl).LocalPath).ToLowerInvariant();
+            tempFilePath += fileExtension;
+            using (FileStream fileStream = new(tempFilePath, FileMode.Create, FileAccess.Write))
+            {
+                await imageStream.CopyToAsync(fileStream);
+            }
             EmbedBuilder builder = embed.ToEmbedBuilder();
             EmbedFieldBuilder? upvotesField = builder.Fields.FirstOrDefault(f => f.Name == "Upvotes");
             List<string> upvotes = upvotesField != null ? upvotesField.Value.ToString()!.Split(separator, 
@@ -72,11 +85,22 @@ namespace Hartsy.Core
             upvotes.Add(user.Username);
             builder.Fields[0].WithIsInline(true).WithValue(string.Join(", ", upvotes));
             builder.WithFooter($"Total Votes: {upvotes.Count(upvote => upvote != "None")}");
-            await message.ModifyAsync(msg =>
+            List<IAttachment> attachments = [.. message.Attachments];
+            // Re-upload the image
+            string filename = Path.GetFileName(new Uri(imageUrl).LocalPath); // Get the original filename with extension
+            string sanitizedFilename = filename.Replace(":", "_");
+            using (FileStream newFileStream = new(tempFilePath, FileMode.Open, FileAccess.Read))
             {
-                msg.Embed = builder.Build();
-                msg.Attachments = null;
-            });
+                FileAttachment fileAttachment = new(newFileStream, sanitizedFilename);
+                builder.WithImageUrl($"attachment://{sanitizedFilename}");
+                await message.ModifyAsync(msg =>
+                {
+                    msg.Embed = builder.Build();
+                    msg.Attachments = new Optional<IEnumerable<FileAttachment>>([fileAttachment]);
+                });
+            }
+            // Delete the temp file after uploading
+            File.Delete(tempFilePath);
             // If upvotes reach 5, send to "top-hartists" channel
             if (upvotes.Count(upvote => upvote != "None") == 5)
             {
