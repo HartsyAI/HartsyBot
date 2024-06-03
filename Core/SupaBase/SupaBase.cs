@@ -287,18 +287,28 @@ namespace Hartsy.Core.SupaBase
         {
             try
             {
+                // Update the user's credit
                 Postgrest.Responses.ModeledResponse<Users> response = await supabase!.From<Users>()
-                                             .Where(x => x.ProviderId == userId)
-                                             .Set(x => x.Credit!, newCredit)
-                                             .Update();
-                // Check the result of the operation
-                if (response.ResponseMessage!.IsSuccessStatusCode)
+                                              .Where(x => x.ProviderId == userId)
+                                              .Set(x => x.Credit!, newCredit)
+                                              .Update();
+                // Check the result of the update operation
+                if (!response.ResponseMessage!.IsSuccessStatusCode)
                 {
+                    Console.WriteLine($"Error updating user credit: {response.ResponseMessage.StatusCode} - {response.ResponseMessage.ReasonPhrase}");
+                    return false;
+                }
+                // Retrieve the updated user data
+                Users? updatedUser = await supabase.From<Users>().Where(x => x.ProviderId == userId).Single();
+                // Verify the credit update
+                if (updatedUser != null && updatedUser.Credit == newCredit)
+                {
+                    Console.WriteLine($"Successfully verified updated credit for user {userId} to {newCredit}.");
                     return true;
                 }
                 else
                 {
-                    Console.WriteLine("Error updating user credit.");
+                    Console.WriteLine($"Verification failed: Updated credit for user {userId} does not match {newCredit}.");
                     return false;
                 }
             }

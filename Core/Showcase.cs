@@ -1,5 +1,7 @@
 ﻿using Discord;
 using Discord.WebSocket;
+using Hartsy.Core.SupaBase;
+using Hartsy.Core.SupaBase.Models;
 
 namespace Hartsy.Core
 {
@@ -99,13 +101,46 @@ namespace Hartsy.Core
                     msg.Attachments = new Optional<IEnumerable<FileAttachment>>([fileAttachment]);
                 });
             }
-            // Delete the temp file after uploading
             File.Delete(tempFilePath);
-            // If upvotes reach 5, send to "top-hartists" channel
-            if (upvotes.Count(upvote => upvote != "None") == 5)
+
+            // If upvotes reach 5, send to "top-hartists" channel, give the user GPUT, and announce the artist
+            if (upvotes.Count(upvote => upvote != "None") == 1)
             {
-                SocketGuildChannel? channelGuild = message.Channel as SocketGuildChannel;
-                SocketGuild guild = channelGuild!.Guild;
+                // TODO: I should do this a better less hacky way
+
+                string description = embed.Description ?? string.Empty;
+                string submittedByPrefix = "Submitted by ";
+                int startIndex = description.IndexOf(submittedByPrefix) + submittedByPrefix.Length;
+                int endIndex = description.IndexOf('\n', startIndex);
+                string username = endIndex == -1 ? description.Substring(startIndex) : description.Substring(startIndex, endIndex - startIndex);
+
+                Console.WriteLine($"User: {username}"); // Debugging
+                                                        // Resolve the username to a Discord user
+                SocketGuild? guild = message.Channel is SocketGuildChannel channelGuild ? channelGuild.Guild : null;
+                SocketGuildUser? originalUser = guild!.Users.FirstOrDefault(u => u.Username == username);
+                if (originalUser == null)
+                {
+                    Console.WriteLine("Original user not found.");
+                    return;
+                }
+                else
+                {
+                    Console.WriteLine($"Original user: {originalUser.Username}");
+                }
+                SupabaseClient supabaseClient = new();
+                Users? dbUser = await supabaseClient.GetUserByDiscordId(originalUser.Id.ToString());
+                if (dbUser != null)
+                {
+                    Console.WriteLine($"Credit: {dbUser.Credit}"); // Debugging
+                    dbUser.Credit = (dbUser.Credit ?? 0) + 10;
+                    Console.WriteLine($"New credit: {dbUser.Credit}"); // Debugging
+                    await supabaseClient.UpdateUserCredit(dbUser.ProviderId!, dbUser.Credit.Value);
+                    Console.WriteLine($"User credit updated: {dbUser.Credit.Value}");
+                }
+                else
+                {
+                    Console.WriteLine("User not found in database.");
+                }
                 await SendToTopHartists(guild, message);
             }
         }
@@ -126,13 +161,13 @@ namespace Hartsy.Core
             if (iEmbed != null)
             {
                 Embed embedBuilder = new EmbedBuilder()
-                    .WithTitle(iEmbed.Title)
+                    .WithTitle("🌟 A new top artist has been selected! 🌟")
                     .WithDescription(iEmbed.Description)
                     .WithFooter(footer => footer.Text = iEmbed.Footer?.Text)
                     .WithImageUrl(iEmbed.Image?.Url)
                     .WithThumbnailUrl(iEmbed.Thumbnail?.Url)
                     .Build();
-                await topHartistsChannel.SendMessageAsync("🌟 A new top artist has been selected! 🌟", embed: embedBuilder);
+                await topHartistsChannel.SendMessageAsync(embed: embedBuilder);
             }
         }
     }
