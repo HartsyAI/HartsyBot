@@ -87,7 +87,7 @@ namespace Hartsy.Core.Commands
                     }
                     Embed embed = BuildEmbed(
                         $"{userInfo.Username}'s Information",
-                        null,
+                        null!,
                         Discord.Color.Blue,
                         "",
                         user!.GetAvatarUrl() ?? user.GetDefaultAvatarUrl(),

@@ -96,7 +96,7 @@ namespace Hartsy.Core
         [ComponentInteraction("notify_me")]
         public async Task NotifyMeButtonHandler()
         {
-            SocketRole role = Context.Guild.Roles.FirstOrDefault(r => r.Name == "Announcement");
+            SocketRole? role = Context.Guild.Roles.FirstOrDefault(r => r.Name == "Announcement");
             SocketGuildUser user = (SocketGuildUser)Context.User;
             if (IsOnCooldown(Context.User, "notify_me"))
             {
