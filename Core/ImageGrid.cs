@@ -110,5 +110,32 @@ namespace Hartsy.Core
                 Console.WriteLine($"ERROR: Failed to add Watermark: {ex}");
             }
         }
+
+        public static async Task<Image<Rgba32>> AddWatermarkBottomRight(Image<Rgba32> mainImage)
+        {
+            Image<Rgba32> watermarkImage;
+            string watermarkPathOrUrl = "../../../images/logo.png";
+            // Load the watermark image from a file or URL
+            if (File.Exists(watermarkPathOrUrl))
+            {
+                watermarkImage = await Image.LoadAsync<Rgba32>(watermarkPathOrUrl);
+            }
+            else
+            {
+                using HttpClient httpClient = new();
+                Stream watermarkStream = await httpClient.GetStreamAsync(watermarkPathOrUrl);
+                watermarkImage = await Image.LoadAsync<Rgba32>(watermarkStream);
+            }
+            // Resize watermark to fit in the bottom right corner
+            int watermarkWidth = mainImage.Width / 5;
+            int watermarkHeight = watermarkImage.Height * watermarkWidth / watermarkImage.Width;
+            watermarkImage.Mutate(x => x.Resize(watermarkWidth, watermarkHeight));
+            // Define the position for the watermark (bottom-right corner)
+            int xPosition = mainImage.Width - watermarkWidth - 10; // 10px padding
+            int yPosition = mainImage.Height - watermarkHeight - 10; // 10px padding
+            // Apply the watermark to the main image
+            mainImage.Mutate(ctx => ctx.DrawImage(watermarkImage, new Point(xPosition, yPosition), 1f));
+            return mainImage;
+        }
     }
 }

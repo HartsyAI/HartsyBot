@@ -2,6 +2,9 @@
 using Discord.WebSocket;
 using Hartsy.Core.SupaBase;
 using Hartsy.Core.SupaBase.Models;
+using Hartsy.Core;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp;
 
 namespace Hartsy.Core
 {
@@ -28,25 +31,33 @@ namespace Hartsy.Core
                 .Build();
             try
             {
-                // Load the image file as an attachment
-                using FileStream fileStream = new(imagePath, FileMode.Open);
-                string filename = Path.GetFileName(imagePath);
-                filename = filename.Replace(":", "_");
-                Embed embed = new EmbedBuilder()
-                    .WithTitle("Showcase Image")
-                    .WithDescription($"Submitted by {user.Username}")
-                    .WithThumbnailUrl(user.GetAvatarUrl() ?? user.GetDefaultAvatarUrl())
-                    .WithImageUrl($"attachment://{filename}")
-                    .AddField("Upvotes", "None", true)
-                    .WithFooter("Total Votes: 0")
-                    .Build();
-                FileAttachment fileAttachment = new(fileStream, filename);
-                IUserMessage message = await showcaseChannel.SendFileAsync(attachment: fileAttachment, text: null, embed: embed, components: components);
-                await showcaseChannel.CreateThreadAsync($"Discuss Showcase by {user.Username}", autoArchiveDuration: ThreadArchiveDuration.OneDay, message: message);
+                // Load the image, add a watermark, and send it to the showcase channel
+                Image<Rgba32> image = await SixLabors.ImageSharp.Image.LoadAsync<Rgba32>(imagePath);
+                Image<Rgba32> watermarkedImage = await ImageGrid.AddWatermarkBottomRight(image);
+                string tempFilePath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".jpeg");
+                await watermarkedImage.SaveAsJpegAsync(tempFilePath);
+                using (FileStream fileStream = new(tempFilePath, FileMode.Open))
+                {
+                    string filename = Path.GetFileName(tempFilePath);
+                    filename = filename.Replace(":", "_");
+                    Console.WriteLine($"Showcasing image: {filename}"); // Debugging
+                    Embed embed = new EmbedBuilder()
+                        .WithTitle("Showcase Image")
+                        .WithDescription($"Submitted by {user.Username}")
+                        .WithThumbnailUrl(user.GetAvatarUrl() ?? user.GetDefaultAvatarUrl())
+                        .WithImageUrl($"attachment://{filename}")
+                        .AddField("Upvotes", "None", true)
+                        .WithFooter("Total Votes: 0")
+                        .Build();
+                    FileAttachment fileAttachment = new(fileStream, filename);
+                    IUserMessage message = await showcaseChannel.SendFileAsync(attachment: fileAttachment, text: null, embed: embed, components: components);
+                    await showcaseChannel.CreateThreadAsync($"Chat about {user.Username}'s Showcased image!", autoArchiveDuration: ThreadArchiveDuration.OneDay, message: message);
+                }
+                File.Delete(tempFilePath);
             }
             catch (Exception ex)
             {
-                   Console.WriteLine($"Error showcasing image: {ex.Message}");
+                Console.WriteLine($"Error showcasing image: {ex.Message}");
             }
         }
 
@@ -73,7 +84,7 @@ namespace Hartsy.Core
             await UpdateEmbedWithImage(message, embed, tempFilePath, user);
             File.Delete(tempFilePath);
             // If upvotes reach 5, send to "top-hartists" channel, give the user GPUT, and announce the artist
-            if (IsUpvotesThresholdReached(embed, 5))
+            if (IsUpvotesThresholdReached(embed, 1))
             {
                 SocketGuild? guild = (message.Channel as SocketGuildChannel)?.Guild;
                 if (guild == null) return;
@@ -90,8 +101,8 @@ namespace Hartsy.Core
                         .WithTitle("🎉 Congratulations! 🎉")
                         .WithDescription("Your image has reached enough upvotes to be added to the Top Hartists " +
                         "channel. As a reward, you have received **10 Free GPUTs**!")
-                        .WithThumbnailUrl(message.Author.GetAvatarUrl())
-                        .WithColor(Color.Gold)
+                        .WithThumbnailUrl(guild.IconUrl)
+                        .WithColor(Discord.Color.Gold)
                         .WithFooter(footer => footer.WithText("Keep creating and showcasing your art to earn " +
                         "more rewards!").WithIconUrl(message.Author.GetAvatarUrl()))
                         .AddField("Earn More GPUTs", "The more art you add to showcase, the more chances you have to get free generations. " +
