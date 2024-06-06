@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Hartsy.Core;
 using Hartsy.Core.SupaBase;
 using Hartsy.Core.Commands;
+using Hartsy.Core.InteractionComponents;
 
 namespace HartsyBot
 {
@@ -75,12 +76,16 @@ namespace HartsyBot
                     LogLevel = LogSeverity.Debug
                 }))
                 .AddSingleton(p => new InteractionService(p.GetRequiredService<DiscordSocketClient>()))
-                .AddSingleton<InteractionHandlers>()
+                .AddSingleton<ComponentHelpers>()
                 .AddSingleton<TemplateAutocompleteHandler>()
                 .AddSingleton<SupabaseClient>()
                 .AddSingleton<StableSwarmAPI>()
                 .AddSingleton<Showcase>()
                 .AddSingleton<UserCommands>()
+                .AddSingleton<AdminCommands>()
+                .AddSingleton<Buttons>()
+                .AddSingleton<SelectMenus>()
+                .AddSingleton<Modals>()
                 .AddSingleton(new HttpClient())
                 .BuildServiceProvider();
         }

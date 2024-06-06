@@ -4,9 +4,6 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp;
-using System.Buffers.Text;
-using Discord.WebSocket;
-using Discord;
 
 namespace Hartsy.Core
 {
@@ -75,7 +72,7 @@ namespace Hartsy.Core
             do
             {
                 result = await webSocket.ReceiveAsync(responseBuffer, CancellationToken.None);
-                var jsonStringFragment = Encoding.UTF8.GetString(responseBuffer.Array!, responseBuffer.Offset, result.Count);
+                string jsonStringFragment = Encoding.UTF8.GetString(responseBuffer.Array!, responseBuffer.Offset, result.Count);
                 stringBuilder.Append(jsonStringFragment);
             } while (!result.EndOfMessage);
 
@@ -90,7 +87,7 @@ namespace Hartsy.Core
             payload["session_id"] = await GetSession();
 
             // Remove all entries where the value is null
-            var keysToRemove = payload.Where(kvp => kvp.Value == null).Select(kvp => kvp.Key).ToList();
+            List<string> keysToRemove = payload.Where(kvp => kvp.Value == null).Select(kvp => kvp.Key).ToList();
             foreach (var key in keysToRemove)
             {
                 payload.Remove(key);
@@ -106,31 +103,25 @@ namespace Hartsy.Core
         /// <returns>An async enumerable of tuples, each containing an Image object and a boolean indicating if it is the final image.</returns>
         public async IAsyncEnumerable<(Image<Rgba32>? Image, bool IsFinal)> GetImages(Dictionary<string, object> payload, string username, ulong messageId)
         {
-            var webSocket = new ClientWebSocket();
+            ClientWebSocket webSocket = new();
             await EnsureWebSocketConnectionAsync(webSocket);
-            var request = await CreateRequestObject(payload);
-
+            Dictionary<string, object> request = await CreateRequestObject(payload);
             await SendRequestAsync(webSocket, request);
-
-            var responseBuffer = new ArraySegment<byte>(new byte[8192]);
+            ArraySegment<byte> responseBuffer = new(new byte[8192]);
             StringBuilder stringBuilder = new();
-
             Dictionary<int, Dictionary<string, string>> previewImages = [];
             Dictionary<int, Dictionary<string, string>> finalImages = [];
-
             while (webSocket.State == WebSocketState.Open)
             {
                 stringBuilder.Clear();
                 WebSocketReceiveResult result = await ReceiveMessage(webSocket, stringBuilder, responseBuffer);
-
                 if (result.MessageType == WebSocketMessageType.Close)
                     break;
                 string jsonString = stringBuilder.ToString();
                 //string logString = ReplaceBase64(jsonString); // DEBUG ONLY
                 //Console.WriteLine("Response JSON (excluding base64 data): " + logString); // DEBUG ONLY
                 Dictionary<string, object>? responseData = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonString);
-
-                foreach (var kvp in responseData!)
+                foreach (KeyValuePair<string, object> kvp in responseData!)
                 {
                     if (responseData != null)
                     {
@@ -164,16 +155,14 @@ namespace Hartsy.Core
                             else if (responseData.TryGetValue("status", out object? pair) && pair is Dictionary<string, object> statusData)
                             {
                                 // List of expected status fields
-                                var statusFields = new[] { "waiting_gens", "loading_models", "waiting_backends", "live_gens" };
-
-                                foreach (var field in statusFields)
+                                string[] statusFields = ["waiting_gens", "loading_models", "waiting_backends", "live_gens"];
+                                foreach (string field in statusFields)
                                 {
                                     // Safely get the value of each field, defaulting to 0 if not found
                                     statusData.TryGetValue(field, out object? data);
                                 }
                             }
                         }
-
                         if (responseData.TryGetValue("image", out object? value))
                         {
                             bool isFinal = true;
@@ -181,31 +170,28 @@ namespace Hartsy.Core
                             string base64WithPrefix = value.ToString()!;
                             string base64 = await RemovePrefix(base64WithPrefix);
                             finalImages[batchIndex] = new Dictionary<string, string> { { "base64", $"{base64}" } };
-
                             if (batchIndex == 3)
                             {
                                 Image<Rgba32> final = await HandleFinal(finalImages, username, messageId);
                                 await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "All final images received", CancellationToken.None);
                                 yield return (final, isFinal);
                                 break;
-
                             }
                         }
                     }
                 }
             }
         }
-        /// <summary>
-        /// Replaces base64 image data in the JSON string with a placeholder to avoid large log entries.
-        /// Additionally, appends the cleaned JSON to a text file.
-        /// </summary>
+
+        /// <summary>Replaces base64 image data in the JSON string with a placeholder to avoid large log entries.
+        /// Additionally, appends the cleaned JSON to a text file.</summary>
         /// <param name="jsonString">The JSON string containing base64 image data.</param>
         /// <returns>A string where base64 image data is replaced with a placeholder and appended to a file.</returns>
         private static string ReplaceBase64(string jsonString)
         {
             // List of base64 image data prefixes to replace with a placeholder
-            var prefixes = new List<string>
-                {
+            List<string> prefixes =
+                [
                     "\"preview\":\"data:image/jpeg;base64,",
                     "\"image\":\"data:image/jpeg;base64,",
                     "\"preview\":\"data:image/png;base64,",
@@ -214,9 +200,8 @@ namespace Hartsy.Core
                     "\"image\":\"data:image/gif;base64,",
                     "\"preview\":\"data:image/webp;base64,",
                     "\"image\":\"data:image/webp;base64,"
-                };
-
-            foreach (var prefix in prefixes)
+                ];
+            foreach (string prefix in prefixes)
             {
                 int start = jsonString.IndexOf(prefix);
                 while (start != -1)
@@ -236,10 +221,8 @@ namespace Hartsy.Core
                     }
                 }
             }
-
             // Append the modified JSON string to a text file
             File.AppendAllText("json.txt", jsonString + Environment.NewLine);
-
             return jsonString;
         }
 
@@ -332,7 +315,7 @@ namespace Hartsy.Core
         /// <returns>A task that represents the asynchronous operation, yielding the generated GIF image.</returns>
         public async IAsyncEnumerable<(string Base64, bool IsFinal, string ETR)> CreateGifAsync(Dictionary<string, object> payload)
         {
-            using var webSocket = new ClientWebSocket();
+            using ClientWebSocket webSocket = new();
             await EnsureWebSocketConnectionAsync(webSocket);
             payload["session_id"] = await GetSession();
             await SendRequestAsync(webSocket, payload);
@@ -352,7 +335,7 @@ namespace Hartsy.Core
                 Console.WriteLine("Response JSON (excluding base64 data): " + logString);
                 Dictionary<string, object>? responseData = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonString);
                 bool isFinal = false;
-                foreach (var kvp in responseData!)
+                foreach (KeyValuePair<string, object> kvp in responseData!)
                 { 
                     if (responseData != null)
                     {
