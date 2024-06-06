@@ -75,7 +75,6 @@ namespace Hartsy.Core
                 string jsonStringFragment = Encoding.UTF8.GetString(responseBuffer.Array!, responseBuffer.Offset, result.Count);
                 stringBuilder.Append(jsonStringFragment);
             } while (!result.EndOfMessage);
-
             return result;
         }
 
