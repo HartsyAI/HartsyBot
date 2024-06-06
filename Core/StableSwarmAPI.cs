@@ -92,7 +92,6 @@ namespace Hartsy.Core
             {
                 payload.Remove(key);
             }
-
             return payload;
         }
 
