@@ -15,26 +15,26 @@ namespace Hartsy.Core
         public static async Task<Image<Rgba32>> CreateGridAsync(Dictionary<int, Dictionary<string, string>> imagesData, string username, ulong messageId)
         {
             // Load the first image to determine the dimensions
-            var firstImageEntry = imagesData.Values.First().First();
+            KeyValuePair<string, string> firstImageEntry = imagesData.Values.First().First();
             byte[] firstImageBytes = Convert.FromBase64String(firstImageEntry.Value);
-            using var firstImage = Image.Load<Rgba32>(firstImageBytes);
+            using Image<Rgba32> firstImage = Image.Load<Rgba32>(firstImageBytes);
             int imageWidth = firstImage.Width;
             int imageHeight = firstImage.Height;
             bool isPreview = imageWidth < 1024;
             int multiplier = isPreview ? 2 : 1;
             int gridWidth = imageWidth * 2 * multiplier;
             int gridHeight = imageHeight * 2 * multiplier;
-            using var gridImage = new Image<Rgba32>(gridWidth, gridHeight);
+            using Image<Rgba32> gridImage = new(gridWidth, gridHeight);
             foreach (var imageEntry in imagesData)
             {
                 int index = imageEntry.Key;
-                var imageData = imageEntry.Value;
+                Dictionary<string, string> imageData = imageEntry.Value;
                 try
                 {
                     if (imageData.TryGetValue("base64", out var base64))
                     {
                         byte[] imageBytes = Convert.FromBase64String(base64);
-                        using var image = Image.Load<Rgba32>(imageBytes);
+                        using Image<Rgba32> image = Image.Load<Rgba32>(imageBytes);
                         // Calculate x and y based on index to arrange in 2x2 grid
                         int x = (index % 2) * imageWidth * multiplier;
                         int y = (index / 2) * imageHeight * multiplier;
@@ -54,6 +54,7 @@ namespace Hartsy.Core
             if (!isPreview)
             {
                 await AddWatermark(gridImage, "../../../images/logo.png");
+                gridImage.Mutate(i => i.Resize(gridWidth / 3, gridHeight / 3));
             }
             // Clone the gridImage to avoid disposal issues
             return gridImage.Clone();
@@ -70,9 +71,9 @@ namespace Hartsy.Core
             // Check if the image is a final image based on its width
             if (image.Width == 1024)
             {
-                var directoryPath = Path.Combine(Directory.GetCurrentDirectory(), $"../../../images/{username}/{messageId}/");
+                string directoryPath = Path.Combine(Directory.GetCurrentDirectory(), $"../../../images/{username}/{messageId}/");
                 Directory.CreateDirectory(directoryPath);  // Ensure the directory exists
-                var filePath = Path.Combine(directoryPath, $"{messageId}:image_{imageIndex}.jpeg");
+                string filePath = Path.Combine(directoryPath, $"{messageId}:image_{imageIndex}.jpeg");
                 await image.SaveAsJpegAsync(filePath);
             }
         }
@@ -86,21 +87,21 @@ namespace Hartsy.Core
             try
             {
                 Console.WriteLine(watermarkImagePath);
-                using var watermarkImage = await Image.LoadAsync<Rgba32>(watermarkImagePath);
-                watermarkImage.Mutate(x => x.Opacity(0.2f)); // Apply 30% transparency to the watermark image
+                using Image<Rgba32> watermarkImage = await Image.LoadAsync<Rgba32>(watermarkImagePath);
+                watermarkImage.Mutate(x => x.Opacity(0.3f)); // Apply 30% transparency to the watermark image
                 // Calculate the size of each quadrant
                 int quadrantWidth = gridImage.Width / 2;
                 int quadrantHeight = gridImage.Height / 2;
                 // Calculate the locations for each watermark in each quadrant
-                var locations = new[]
-                {
+                Point[] locations =
+                [
                     new Point(quadrantWidth - watermarkImage.Width, quadrantHeight - watermarkImage.Height),
                     new Point(gridImage.Width - watermarkImage.Width, quadrantHeight - watermarkImage.Height),
                     new Point(quadrantWidth - watermarkImage.Width, gridImage.Height - watermarkImage.Height),
                     new Point(gridImage.Width - watermarkImage.Width, gridImage.Height - watermarkImage.Height)
-                };
+                ];
                 // Draw the watermark image on each quadrant
-                foreach (var location in locations)
+                foreach (Point location in locations)
                 {
                     gridImage.Mutate(x => x.DrawImage(watermarkImage, location, 1f));
                 }
@@ -114,7 +115,7 @@ namespace Hartsy.Core
         public static async Task<Image<Rgba32>> AddWatermarkBottomRight(Image<Rgba32> mainImage)
         {
             Image<Rgba32> watermarkImage;
-            string watermarkPathOrUrl = "../../../images/logo.png";
+            string watermarkPathOrUrl = "../../../images/logo.png" ?? "https://github.com/kalebbroo/Hartsy/blob/main/images/logo.png?raw=true";
             // Load the watermark image from a file or URL
             if (File.Exists(watermarkPathOrUrl))
             {
