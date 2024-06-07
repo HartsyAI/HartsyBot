@@ -351,5 +351,43 @@ namespace Hartsy.Core.SupaBase
                 return null!;
             }
         }
+
+        /// <summary>Gets the count of images a user has in their gallery.</summary>
+        /// <param name="userId">The ID of the user whose images are being counted.</param>
+        /// <returns>A task representing the asynchronous operation. The task result contains the count of images the user has in the gallery.</returns>
+        public async Task<int> GetUserImageCountInGallery(string userId)
+        {
+            try
+            {
+                Postgrest.Responses.ModeledResponse<Images> response = await supabase!
+                    .From<Images>()
+                    .Select("id")
+                    .Filter("user_id", Operator.Equals, userId)
+                    .Get();
+                return response.Models.Count;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error getting user image count in gallery: {ex.Message}");
+                return 0; // Return 0 in case of error
+            }
+        }
+
+        /// <summary>Gets the maximum number of images allowed based on the user's subscription plan.</summary>
+        /// <param name="planName"></param>
+        /// <returns></returns>
+        public int GetMaxImagesAllowed(string? planName)
+        {
+            // Replace with actual logic to determine max images allowed based on planName
+            return planName switch
+            {
+                "Studio" => 2000,
+                "Pro" => 500,
+                "Hobbyist" => 250,
+                "Free" => 10,
+                _ => 3, // Fallback to 3 for unknown plans
+            };
+        }
+
     }
 }

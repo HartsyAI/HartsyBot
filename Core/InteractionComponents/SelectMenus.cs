@@ -114,18 +114,56 @@ namespace Hartsy.Core.InteractionComponents
                     }
                     else if (actionType == "add")
                     {
-                        // TODO: Check if the user has room in the gallery to add the image
+                        int userImageCount = await supaBase.GetUserImageCountInGallery(supaUser.Id!);
+                        int maxImagesAllowed = supaBase.GetMaxImagesAllowed(supaUser.PlanName);
+                        if (userImageCount >= maxImagesAllowed)
+                        {
+                            EmbedBuilder errorEmbed = new EmbedBuilder()
+                                .WithTitle("ERROR: Gallery At Capacity❗")
+                                .WithDescription($"Your current plan, **{supaUser.PlanName}**, allows for a maximum of {maxImagesAllowed} images. " +
+                                    $"You currently have {userImageCount} images in your gallery. To add more images, please upgrade your plan or " +
+                                    $"remove some existing images. Visit [Hartsy.AI](https://hartsy.ai) to manage your plan and gallery.")
+                                .WithColor(Discord.Color.Red)
+                                .WithCurrentTimestamp();
+                            await FollowupAsync(embed: errorEmbed.Build(), ephemeral: true);
+                            return;
+                        }
                         string? supaUserId = supaUser?.Id;
                         string url = await supaBase.UploadImage(supaUserId!, filePath);
+                        using FileStream fileStream = new(filePath, FileMode.Open, FileAccess.Read);
+                        string filename = Path.GetFileName(filePath).Replace(":", "");
+                        Console.WriteLine($"Filename: {filename}"); // Debugging
                         if (url != null)
                         {
                             await supaBase.AddImage(supaUserId!, url);
                             EmbedBuilder embed = new EmbedBuilder()
                                 .WithTitle("Image Saved Successfully")
-                                .WithDescription("Your image has been added to your gallery. You can go to [Hartsy.ai](https://hartsy.ai) to view and download.")
+                                .WithDescription($"Your image has been added to your gallery. Your **{supaUser!.PlanName}** plan allows for a maximum of " +
+                                $"**{maxImagesAllowed}** images in your gallery. You now have {userImageCount + 1} images. Go to [Hartsy.AI](https://hartsy.ai) " +
+                                "to manage your subscription, or view and download the uncompressed image. Discord will compress images, so it's best to download a copy from " +
+                                "your gallery. However, the image is also available here for your convience")
+                                .WithImageUrl($"attachment://{filename}")
                                 .WithColor(Discord.Color.Green)
                                 .WithCurrentTimestamp();
-                            await FollowupAsync(embed: embed.Build(), ephemeral: true);
+                            bool isDmEnabled = false;
+                            try
+                            {
+                                fileStream.Position = 0;
+                                FileAttachment fileAttachment = new(fileStream, filename);
+                                await user.SendFileAsync(attachment: fileAttachment, embed: embed.Build());
+                                isDmEnabled = true;
+                            }
+                            catch
+                            {
+                                Console.WriteLine("DM failed, falling back to channel reply.");
+                            }
+
+                            if (!isDmEnabled)
+                            {
+                                fileStream.Position = 0;
+                                FileAttachment fileAttachment = new(fileStream, filename);
+                                await FollowupWithFileAsync(attachment: fileAttachment, embed: embed.Build());
+                            }
                         }
                         else
                         {
