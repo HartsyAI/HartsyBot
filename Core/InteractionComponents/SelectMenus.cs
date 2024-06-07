@@ -139,7 +139,7 @@ namespace Hartsy.Core.InteractionComponents
                             EmbedBuilder embed = new EmbedBuilder()
                                 .WithTitle("Image Saved Successfully")
                                 .WithDescription($"Your image has been added to your gallery. Your **{supaUser!.PlanName}** plan allows for a maximum of " +
-                                $"**{maxImagesAllowed}** images in your gallery. You now have {userImageCount + 1} images. Go to [Hartsy.AI](https://hartsy.ai) " +
+                                $"**{maxImagesAllowed}** images in your gallery. You now have **{userImageCount + 1}** images. Go to [Hartsy.AI](https://hartsy.ai) " +
                                 "to manage your subscription, or view and download the uncompressed image. Discord will compress images, so it's best to download a copy from " +
                                 "your gallery. However, the image is also available here for your convience")
                                 .WithImageUrl($"attachment://{filename}")
