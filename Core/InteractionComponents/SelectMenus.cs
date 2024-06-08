@@ -200,7 +200,7 @@ namespace Hartsy.Core.InteractionComponents
                     .WithTitle("✨ GIF Generation in Progress...")
                     .WithThumbnailUrl($"https://github.com/kalebbroo/Hartsy/blob/main/images/logo.png?raw=true")
                     .WithImageUrl($"attachment://new_image.{suffix}")
-                    .WithColor(Discord.Color.Red)
+                    .WithColor(isFinal ? Discord.Color.Green : Discord.Color.Red)
                     .WithDescription($"Estimated Time Remaining: **{ETR}**")
                     .AddField("Status", isFinal ? "✅ Final GIF generated!" : "🔄 Updating GIF...", true)
                     .AddField("Progress", isFinal ? "100%" : "Ongoing", true)
