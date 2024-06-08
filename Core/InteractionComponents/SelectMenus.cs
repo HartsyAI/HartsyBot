@@ -15,7 +15,9 @@ namespace Hartsy.Core.InteractionComponents
     public class SelectMenus(UserCommands commands, SupabaseClient supaBase, StableSwarmAPI stableSwarmAPI) : InteractionModuleBase<SocketInteractionContext>
     {
 
-        /// <summary>Handles the interaction when an image is selected for a specific action, such as showcasing or saving to gallery.</summary>
+        /// <summary>Handles the interaction when an image is selected for a specific action, such as showcasing or saving to gallery.
+        /// Verifies the user's identity, checks if the image file exists, validates the user's subscription and credit, 
+        /// and executes the appropriate action based on the selected option.</summary>
         /// <param name="customId">The custom ID associated with the select menu that triggered the interaction.</param>
         /// <param name="selections">The selections made by the user in the select menu.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
@@ -27,276 +29,340 @@ namespace Hartsy.Core.InteractionComponents
             if (!string.IsNullOrEmpty(selectedValue))
             {
                 string[] parts = customId.Split(':');
-                if (parts.Length >= 4) return;
-                string actionType = parts[0]; // Should give "i2i" or "add"
-                string userid = parts[1]; // Should give the userId part
-                string messageId = parts[2]; // Should give the messageId part
-                SocketMessageComponent? interaction = Context.Interaction as SocketMessageComponent;
-                string username = interaction!.User.Username;
-                string userId = interaction.User.Id.ToString();
-                if (userId != userid)
+                if (parts.Length < 3) return;
+                string actionType = parts[0];
+                string userId = parts[1];
+                string messageId = parts[2];
+                if (Context.User.Id.ToString() != userId)
                 {
-                    EmbedBuilder errorEmbed = new EmbedBuilder()
-                        .WithTitle("Selection Error")
-                        .WithDescription("Error: You cannot select another user's image.")
-                        .WithColor(Discord.Color.Red)
-                        .WithCurrentTimestamp();
-                    await FollowupAsync(embed: errorEmbed.Build(), ephemeral: true);
+                    await RespondWithError("Selection Error", "Error: You cannot select another user's image.");
                     return;
                 }
-                string filePath = "";
-                string directoryPath = "";
-                string initimage = "";
-                try
+                string filePath = Path.Combine(Directory.GetCurrentDirectory(), $"../../../images/{Context.User.Username}/{messageId}/{messageId}:{selectedValue}.jpeg");
+                if (!File.Exists(filePath))
                 {
-                    // Construct the full path
-                    directoryPath = Path.Combine(Directory.GetCurrentDirectory(), $"../../../images/{username}/{messageId}");
-                    filePath = Path.Combine(directoryPath, $"{messageId}:{selectedValue}.jpeg");
-                    // Ensure the directory exists
-                    if (!Directory.Exists(directoryPath))
-                    {
-                        Console.WriteLine("Directory does not exist.");
-                        // Depending on your requirements, you can create the directory or handle it as an error
-                        Directory.CreateDirectory(directoryPath);
-                        Console.WriteLine("Directory created.");
-                    }
-                    // Check if the file exists
-                    if (!File.Exists(filePath))
-                    {
-                        Console.WriteLine("File does not exist.");
-                        await FollowupAsync("Error: Image not found.", ephemeral: true);
-                        return;  // Exit if the file does not exist
-                    }
-                    // Proceed with reading the file
-                    initimage = Convert.ToBase64String(File.ReadAllBytes(filePath));
+                    await FollowupAsync("Error: Image not found.", ephemeral: true);
+                    return;
                 }
-                catch (IOException ex)
-                {
-                    Console.WriteLine($"An I/O error occurred: {ex.Message}");
-                    await FollowupAsync("Error processing the image file.", ephemeral: true);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"An unexpected error occurred: {ex.Message}");
-                    await FollowupAsync("An unexpected error occurred while processing your request.", ephemeral: true);
-                }
-                SocketTextChannel? channel = Context.Channel as SocketTextChannel;
                 SocketGuildUser? user = Context.User as SocketGuildUser;
                 Users? supaUser = await supaBase.GetUserByDiscordId(user!.Id.ToString());
-                string? subStatus = supaUser!.PlanName;
-                if (subStatus == null || supaUser.Credit <= 0)
+                if (supaUser == null || supaUser.PlanName == null || supaUser.Credit <= 0)
                 {
-                    Console.WriteLine($"Subscription status or credit issue. Status: {subStatus}, Credits: {supaUser.Credit}");
                     await UserCommands.HandleSubscriptionFailure(Context);
-                    // TODO: Move HandleSubscriptionFailure to a shared helper method
-
                     return;
                 }
                 int credits = supaUser.Credit ?? 0;
-                Embed creditEmbed = new EmbedBuilder()
-                                .WithTitle("Image Generation")
-                                .WithDescription($"You have {credits} GPUT. You will have {credits - 1} GPUT after this image is generated.")
-                                .AddField("Generate Command", "This command allows you to generate images based on the text and template you provide. " +
-                                "Each generation will use one GPUT from your account.\n\nGo to [Hartsy.ai](https://hartsy.ai) to check sub status or add GPUTs")
-                                .WithColor(Discord.Color.Gold)
-                                .WithCurrentTimestamp()
-                                .Build();
-                if (File.Exists(filePath))
+                await FollowupAsync(embed: CreateCreditEmbed(credits), ephemeral: true);
+                switch (actionType)
                 {
-                    if (actionType == "i2i")
-                    {
-                        IUserMessage? message = await Context.Channel.GetMessageAsync(Convert.ToUInt64(messageId)) as IUserMessage;
-                        IEmbed embed = message!.Embeds.First();
-                        var (text, description, template) = ComponentHelpers.ParseEmbed(embed);
-                        await FollowupAsync(embed: creditEmbed, ephemeral: true);
-                        await commands.GenerateFromTemplate(text, template, channel, user, description, initimage);
-                        await supaBase.UpdateUserCredit(user.Id.ToString(), credits - 1);
-                    }
-                    else if (actionType == "add")
-                    {
-                        int userImageCount = await supaBase.GetUserImageCountInGallery(supaUser.Id!);
-                        int maxImagesAllowed = supaBase.GetMaxImagesAllowed(supaUser.PlanName);
-                        if (userImageCount >= maxImagesAllowed)
-                        {
-                            EmbedBuilder errorEmbed = new EmbedBuilder()
-                                .WithTitle("ERROR: Gallery At Capacity❗")
-                                .WithDescription($"Your current plan, **{supaUser.PlanName}**, allows for a maximum of {maxImagesAllowed} images. " +
-                                    $"You currently have {userImageCount} images in your gallery. To add more images, please upgrade your plan or " +
-                                    $"remove some existing images. Visit [Hartsy.AI](https://hartsy.ai) to manage your plan and gallery.")
-                                .WithColor(Discord.Color.Red)
-                                .WithCurrentTimestamp();
-                            await FollowupAsync(embed: errorEmbed.Build(), ephemeral: true);
-                            return;
-                        }
-                        string? supaUserId = supaUser?.Id;
-                        string url = await supaBase.UploadImage(supaUserId!, filePath);
-                        using FileStream fileStream = new(filePath, FileMode.Open, FileAccess.Read);
-                        string filename = Path.GetFileName(filePath).Replace(":", "");
-                        Console.WriteLine($"Filename: {filename}"); // Debugging
-                        if (url != null)
-                        {
-                            await supaBase.AddImage(supaUserId!, url);
-                            EmbedBuilder embed = new EmbedBuilder()
-                                .WithTitle("Image Saved Successfully")
-                                .WithDescription($"Your image has been added to your gallery. Your **{supaUser!.PlanName}** plan allows for a maximum of " +
-                                $"**{maxImagesAllowed}** images in your gallery. You now have **{userImageCount + 1}** images. Go to [Hartsy.AI](https://hartsy.ai) " +
-                                "to manage your subscription, or view and download the uncompressed image. Discord will compress images, so it's best to download a copy from " +
-                                "your gallery. However, the image is also available here for your convience")
-                                .WithImageUrl($"attachment://{filename}")
-                                .WithColor(Discord.Color.Green)
-                                .WithCurrentTimestamp();
-                            bool isDmEnabled = false;
-                            try
-                            {
-                                fileStream.Position = 0;
-                                FileAttachment fileAttachment = new(fileStream, filename);
-                                await user.SendFileAsync(attachment: fileAttachment, embed: embed.Build());
-                                isDmEnabled = true;
-                            }
-                            catch
-                            {
-                                Console.WriteLine("DM failed, falling back to channel reply.");
-                            }
-
-                            if (!isDmEnabled)
-                            {
-                                fileStream.Position = 0;
-                                FileAttachment fileAttachment = new(fileStream, filename);
-                                await FollowupWithFileAsync(attachment: fileAttachment, embed: embed.Build());
-                            }
-                        }
-                        else
-                        {
-                            await FollowupAsync("Error saving image.", ephemeral: true);
-                        }
-                    }
-                    else if (actionType == "showcase")
-                    {
+                    case "i2i":
+                        await HandleImageToImage(user!, messageId, filePath);
+                        break;
+                    case "add":
+                        await HandleAddImageToGallery(user!, supaUser, filePath);
+                        break;
+                    case "showcase":
                         await Showcase.ShowcaseImageAsync(Context.Guild, filePath, Context.User);
                         await FollowupAsync("Image added to the showcase!", ephemeral: true);
-                    }
-                    else if (actionType == "gif")
-                    {
-                        Dictionary<string, object> payload = new()
-                        {
-                            {"prompt", "clear vibrant text"},
-                            {"negativeprompt", "blurry"},
-                            {"images", 1},
-                            {"donotsave", true},
-                            {"model", "StarlightXL.safetensors"},
-                            {"loras", "an0tha0ne"},
-                            {"loraweights", 0.8},
-                            {"width", 1024},
-                            {"height", 768},
-                            {"cfgscale", 6.5},
-                            {"steps", 1},
-                            {"seed", -1},
-                            {"sampler", "dpmpp_3m_sde_gpu"},
-                            {"scheduler", "karras"},
-                            {"initimage", initimage!},
-                            {"init_image_creativity", 0},
-                            // Video-specific parameters //
-                            {"video_model", "OfficialStableDiffusion/svd_xt_1_1.safetensors"},
-                            {"video_format", "gif"},
-                            {"videopreviewtype", "animate"},
-                            {"videoresolution", "image"},
-                            {"videoboomerang", true},
-                            {"video_frames", 25},
-                            {"video_fps", 60},
-                            {"video_steps", 22},
-                            {"video_cfg", 2.5},
-                            {"video_min_cfg", 1},
-                            {"video_motion_bucket", 127},
-                        };
-                        RestUserMessage processingMessage = await Context.Channel.SendMessageAsync("Starting GIF generation...");
-                        EmbedBuilder updatedEmbed = new EmbedBuilder().WithTitle("GIF Generation in Progress...");
-                        await foreach (var (base64String, isFinal, ETR) in stableSwarmAPI.CreateGifAsync(payload))
-                        {
-                            try
-                            {
-                                // Convert the base64 string to a byte array
-                                byte[] imageData = Convert.FromBase64String(base64String);
-                                using MemoryStream imageStream = new(imageData);
-                                MemoryStream embedStream = new();
-                                imageStream.Position = 0; // Ensure the stream position is at the beginning for all checks
-                                string suffix = "";
-                                // Read the necessary header bytes for the largest expected header
-                                byte[] header = new byte[12];
-                                if (imageStream.Length >= header.Length)
-                                {
-                                    imageStream.Read(header, 0, header.Length);
-                                    imageStream.Position = 0; // Reset position if further operations are needed on the stream
-                                    // Check if GIF
-                                    if (header[0] == 0x47 && header[1] == 0x49 && header[2] == 0x46)
-                                    {
-                                        suffix = "gif";
-                                        Console.WriteLine("GIF generated");
-                                        embedStream = imageStream;
-                                    }
-                                    // Check if JPEG
-                                    else if (header[0] == 0xFF && header[1] == 0xD8)
-                                    {
-                                        suffix = "jpeg";
-                                        Console.WriteLine("JPEG generated");
-                                        embedStream = imageStream;
-                                        // resize the image to 1024x768
-                                        // TODO: Add proper using statement for SixLabors.ImageSharp
-                                        using SixLabors.ImageSharp.Image image = SixLabors.ImageSharp.Image.Load(imageData);
-                                        image.Mutate(i => i.Resize(1024, 768));
-                                        embedStream = new MemoryStream();
-                                        image.SaveAsJpeg(embedStream);
-                                    }
-                                    // Check for WebP
-                                    else if (header[8] == 0x57 && header[9] == 0x45 && header[10] == 0x42 && header[11] == 0x50)
-                                    {
-                                        suffix = "gif";
-                                        Console.WriteLine("WebP detected");
-                                        try
-                                        {
-                                            // Load the WebP image directly from the byte array
-                                            using (SixLabors.ImageSharp.Image image = SixLabors.ImageSharp.Image.Load(imageData))
-                                            {
-                                                // Triple the dimensions of the image
-                                                int newWidth = image.Width * 3;
-                                                int newHeight = image.Height * 3;
-                                                // Resize the image
-                                                image.Mutate(x => x.Resize(newWidth, newHeight));
-                                                // Configure the GIF encoder to handle animation if necessary
-                                                GifEncoder encoder = new()
-                                                {
-                                                    ColorTableMode = GifColorTableMode.Global,  // Use global color table for better compression
-                                                    Quantizer = new WebSafePaletteQuantizer(),  // Reduce the number of colors if necessary
-                                                };
-                                                // Save the image as GIF to the MemoryStream
-                                                image.SaveAsGif(embedStream, encoder);
-                                            }
-                                            embedStream.Position = 0;  // Reset the position of the MemoryStream for reading
-                                        }
-                                        catch (Exception ex)
-                                        {
-                                            Console.WriteLine($"An error occurred during the WebP to GIF conversion: {ex.Message}");
-                                        }
-                                    }
-                                    // Use the MemoryStream for attachment and message updating
-                                    FileAttachment file = new(embedStream, $"new_image.{suffix}");
-                                    updatedEmbed.WithImageUrl($"attachment://new_image.{suffix}");
-                                    updatedEmbed.WithColor(Discord.Color.Red);
-                                    updatedEmbed.WithDescription($"Estimated Time Remaining: {ETR}");
-                                    await processingMessage.ModifyAsync(msg =>
-                                    {
-                                        msg.Embeds = new[] { updatedEmbed.Build() };
-                                        msg.Content = isFinal ? "Final GIF generated:" : "Updating GIF...";
-                                        msg.Attachments = new[] { file };
-                                    });
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                Console.WriteLine($"An error occurred: {ex.Message}");
-                            }
-                        }
-                    }
+                        break;
+                    case "gif":
+                        await GenerateGif(filePath);
+                        break;
+                    default:
+                        await FollowupAsync("Invalid action type.", ephemeral: true);
+                        break;
                 }
+            }
+        }
+
+        /// <summary>Processes an image-to-image generation request by extracting parameters from the message embed, 
+        /// converting the selected image to Base64, and calling the template generation command. 
+        /// Updates the user's credit after generation.</summary>
+        /// <param name="user">The user who initiated the image-to-image generation.</param>
+        /// <param name="messageId">The message ID associated with the original image message.</param>
+        /// <param name="filePath">The file path of the selected image.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        private async Task HandleImageToImage(SocketGuildUser user, string messageId, string filePath)
+        {
+            IUserMessage? message = await Context.Channel.GetMessageAsync(Convert.ToUInt64(messageId)) as IUserMessage;
+            IEmbed embed = message!.Embeds.First();
+            var (text, description, template) = ComponentHelpers.ParseEmbed(embed);
+            string initimage = Convert.ToBase64String(File.ReadAllBytes(filePath));
+            await commands.GenerateFromTemplate(text, template, Context.Channel as SocketTextChannel, user, description, initimage);
+            int newCredit = (await supaBase.GetUserByDiscordId(user.Id.ToString()))!.Credit ?? 0 - 1;
+            await supaBase.UpdateUserCredit(user.Id.ToString(), newCredit);
+        }
+
+        /// <summary>Manages the addition of an image to the user's gallery. Checks if the user's gallery is full, 
+        /// uploads the image to Supabase, adds the image record to the database, 
+        /// and sends the image to the user either via DM or channel reply.</summary>
+        /// <param name="user">The user who is adding the image to their gallery.</param>
+        /// <param name="supaUser">The user's Supabase information.</param>
+        /// <param name="filePath">The file path of the image being added.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        private async Task HandleAddImageToGallery(SocketGuildUser user, Users supaUser, string filePath)
+        {
+            int userImageCount = await supaBase.GetUserImageCountInGallery(supaUser.Id!);
+            int maxImagesAllowed = SupabaseClient.GetMaxImagesAllowed(supaUser.PlanName);
+            if (userImageCount >= maxImagesAllowed)
+            {
+                await FollowupAsync(embed: CreateGalleryFullEmbed(supaUser, maxImagesAllowed, userImageCount), ephemeral: true);
+                return;
+            }
+            string url = await supaBase.UploadImage(supaUser.Id!, filePath);
+            if (url != null)
+            {
+                await supaBase.AddImage(supaUser.Id!, url);
+                await SendImageToUserOrFollowup(user, filePath, supaUser.PlanName!, maxImagesAllowed, userImageCount + 1);
+            }
+            else
+            {
+                await FollowupAsync("Error saving image.", ephemeral: true);
+            }
+        }
+
+        /// <summary>Initiates GIF generation from the selected image. Converts the image to Base64, 
+        /// creates the payload for GIF generation, and processes the GIF generation updates, 
+        /// modifying the progress message with the current status and the generated GIF.</summary>
+        /// <param name="filePath">The file path of the image to be converted into a GIF.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        private async Task GenerateGif(string filePath)
+        {
+            string initimage = Convert.ToBase64String(File.ReadAllBytes(filePath));
+            Dictionary<string, object> payload = CreateGifPayload(initimage);
+            RestUserMessage processingMessage = await Context.Channel.SendMessageAsync("Starting GIF generation...");
+            await foreach (var (base64String, isFinal, ETR) in stableSwarmAPI.CreateGifAsync(payload))
+            {
+                await HandleGifGenerationUpdate(processingMessage, base64String, isFinal, ETR);
+            }
+        }
+
+        /// <summary>Constructs the payload dictionary for GIF generation, including various parameters such as prompt, model, 
+        /// image dimensions, video format, and specific settings for GIF creation.</summary>
+        /// <param name="initimage">The initial image in Base64 format to be used in the GIF generation.</param>
+        /// <returns>A dictionary containing the payload parameters for the GIF generation request.</returns>
+        private static Dictionary<string, object> CreateGifPayload(string initimage)
+        {
+            return new Dictionary<string, object>
+            {
+                {"prompt", "clear vibrant text"},
+                {"negativeprompt", "blurry"},
+                {"images", 1},
+                {"donotsave", true},
+                {"model", "StarlightXL.safetensors"},
+                {"loras", "an0tha0ne"},
+                {"loraweights", 0.8},
+                {"width", 1024},
+                {"height", 768},
+                {"cfgscale", 6.5},
+                {"steps", 1},
+                {"seed", -1},
+                {"sampler", "dpmpp_3m_sde_gpu"},
+                {"scheduler", "karras"},
+                {"initimage", initimage},
+                {"init_image_creativity", 0},
+                {"video_model", "OfficialStableDiffusion/svd_xt_1_1.safetensors"},
+                {"video_format", "gif"},
+                {"videopreviewtype", "animate"},
+                {"videoresolution", "image"},
+                {"videoboomerang", true},
+                {"video_frames", 25},
+                {"video_fps", 60},
+                {"video_steps", 22},
+                {"video_cfg", 2.5},
+                {"video_min_cfg", 1},
+                {"video_motion_bucket", 127},
+            };
+        }
+
+        /// <summary>
+        /// Handles updates during the GIF generation process. Processes the Base64 string of the generated image, 
+        /// determines the image format, resizes if necessary, and updates the progress message with the current status and attached GIF image.
+        /// </summary>
+        /// <param name="processingMessage">The message indicating the progress of the GIF generation.</param>
+        /// <param name="base64String">The Base64 string of the generated image.</param>
+        /// <param name="isFinal">Indicates if the image is the final output.</param>
+        /// <param name="ETR">Estimated time remaining for the GIF generation.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        private static async Task HandleGifGenerationUpdate(RestUserMessage processingMessage, string base64String, bool isFinal, string ETR)
+        {
+            try
+            {
+                byte[] imageData = Convert.FromBase64String(base64String);
+                using MemoryStream imageStream = new(imageData);
+                MemoryStream embedStream = new();
+                imageStream.Position = 0;
+                string suffix = GetImageSuffix(imageStream);
+                await ProcessImageStream(imageStream, embedStream, suffix, !isFinal);
+                FileAttachment file = new(embedStream, $"new_image.{suffix}");
+                EmbedBuilder updatedEmbed = new EmbedBuilder()
+                    //.WithAuthor($"{processingMessage.Author.GlobalName}", $"{processingMessage.Author.GetAvatarUrl}", "https://hartsy.ai")
+                    .WithTitle("✨ GIF Generation in Progress...")
+                    .WithThumbnailUrl($"https://github.com/kalebbroo/Hartsy/blob/main/images/logo.png?raw=true")
+                    .WithImageUrl($"attachment://new_image.{suffix}")
+                    .WithColor(Discord.Color.Red)
+                    .WithDescription($"Estimated Time Remaining: **{ETR}**")
+                    .AddField("Status", isFinal ? "✅ Final GIF generated!" : "🔄 Updating GIF...", true)
+                    .AddField("Progress", isFinal ? "100%" : "Ongoing", true)
+                    .WithFooter(footer => footer
+                        .WithText("Powered by Hartsy.AI")
+                        .WithIconUrl("https://github.com/kalebbroo/Hartsy/blob/main/images/logo.png?raw=true"))
+                    .WithTimestamp(DateTimeOffset.Now);
+                await processingMessage.ModifyAsync(msg =>
+                {
+                    msg.Embeds = new[] { updatedEmbed.Build() };
+                    msg.Content = "";
+                    msg.Attachments = new[] { file };
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
+            }
+        }
+
+        /// <summary>Determines the image format suffix (e.g., "gif" or "jpeg") based on the header bytes of the provided image stream. 
+        /// Identifies the format by checking specific byte patterns in the image header.</summary>
+        /// <param name="imageStream">The memory stream containing the image data.</param>
+        /// <returns>A string representing the image format suffix.</returns>
+        private static string GetImageSuffix(MemoryStream imageStream)
+        {
+            byte[] header = new byte[12];
+            imageStream.Read(header, 0, header.Length);
+            imageStream.Position = 0;
+            if (header[0] == 0x47 && header[1] == 0x49 && header[2] == 0x46) return "gif";
+            if (header[0] == 0xFF && header[1] == 0xD8) return "jpeg";
+            if (header[8] == 0x57 && header[9] == 0x45 && header[10] == 0x42 && header[11] == 0x50) return "gif";
+            throw new InvalidOperationException("Unsupported image format");
+        }
+
+        /// <summary>Processes the image stream for embedding in a message. Resizes preview images, maintains final image sizes, 
+        /// and saves the processed image stream in the appropriate format (JPEG or GIF).</summary>
+        /// <param name="imageStream">The memory stream containing the image data.</param>
+        /// <param name="embedStream">The memory stream to store the processed image data.</param>
+        /// <param name="suffix">The image format suffix.</param>
+        /// <param name="isPreview">Indicates if the image is a preview and needs resizing.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        private static async Task ProcessImageStream(MemoryStream imageStream, MemoryStream embedStream, string suffix, bool isPreview)
+        {
+            if (suffix == "jpeg")
+            {
+                using SixLabors.ImageSharp.Image image = SixLabors.ImageSharp.Image.Load(imageStream);
+                if (isPreview)
+                {
+                    image.Mutate(i => i.Resize(1024, 768));
+                }
+                await image.SaveAsJpegAsync(embedStream);
+            }
+            else if (suffix == "gif")
+            {
+                using SixLabors.ImageSharp.Image image = SixLabors.ImageSharp.Image.Load(imageStream);
+                if (isPreview)
+                {
+                    int newWidth = image.Width * 3;
+                    int newHeight = image.Height * 3;
+                    image.Mutate(x => x.Resize(newWidth, newHeight));
+                }
+                GifEncoder encoder = new() { ColorTableMode = GifColorTableMode.Global, Quantizer = new WebSafePaletteQuantizer() };
+                await image.SaveAsGifAsync(embedStream, encoder);
+            }
+            else
+            {
+                await imageStream.CopyToAsync(embedStream);
+            }
+            embedStream.Position = 0;
+        }
+
+        /// <summary>Creates an embed message indicating the user's current GPUT balance and the expected balance after generating an image. 
+        /// Includes information on the generate command and a link to Hartsy.ai for managing subscription and credits.</summary>
+        /// <param name="credits">The current GPUT balance of the user.</param>
+        /// <returns>An Embed object containing the credit information.</returns>
+        private static Embed CreateCreditEmbed(int credits)
+        {
+            return new EmbedBuilder()
+                .WithTitle("Image Generation")
+                .WithDescription($"You have {credits} GPUT. You will have {credits - 1} GPUT after this image is generated.")
+                .AddField("Generate Command", "This command allows you to generate images based on the text and template you provide. " +
+                    "Each generation will use one GPUT from your account.\n\nGo to [Hartsy.ai](https://hartsy.ai) to check sub status or add GPUTs")
+                .WithColor(Discord.Color.Gold)
+                .WithCurrentTimestamp()
+                .Build();
+        }
+
+        /// <summary>Generates an embed message indicating that the user's gallery is full. 
+        /// Provides details about the user's current plan, the maximum number of allowed images, 
+        /// and instructions to upgrade the plan or remove existing images. Includes a link to Hartsy.ai for managing the gallery and subscription.</summary>
+        /// <param name="supaUser">The user's Supabase information.</param>
+        /// <param name="maxImagesAllowed">The maximum number of images allowed in the user's gallery based on their plan.</param>
+        /// <param name="userImageCount">The current number of images in the user's gallery.</param>
+        /// <returns>An Embed object indicating that the gallery is full.</returns>
+        private static Embed CreateGalleryFullEmbed(Users supaUser, int maxImagesAllowed, int userImageCount)
+        {
+            return new EmbedBuilder()
+                .WithTitle("ERROR: Gallery At Capacity❗")
+                .WithDescription($"Your current plan, **{supaUser.PlanName}**, allows for a maximum of {maxImagesAllowed} images. " +
+                    $"You currently have {userImageCount} images in your gallery. To add more images, please upgrade your plan or " +
+                    $"remove some existing images. Visit [Hartsy.AI](https://hartsy.ai) to manage your plan and gallery.")
+                .WithColor(Discord.Color.Red)
+                .WithCurrentTimestamp()
+                .Build();
+        }
+
+        /// <summary>Constructs and sends an error embed message in response to an invalid or unauthorized interaction. 
+        /// Takes a title and description as parameters, sets the embed color to red, and includes the current timestamp.</summary>
+        /// <param name="title">The title of the error message.</param>
+        /// <param name="description">The description of the error message.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        private async Task RespondWithError(string title, string description)
+        {
+            EmbedBuilder errorEmbed = new EmbedBuilder()
+                .WithTitle(title)
+                .WithDescription(description)
+                .WithColor(Discord.Color.Red)
+                .WithCurrentTimestamp();
+            await FollowupAsync(embed: errorEmbed.Build(), ephemeral: true);
+        }
+
+        /// <summary>Sends the saved image to the user either via DM or as a follow-up message in the channel. 
+        /// Constructs an embed message with the image information and handles the file attachment. 
+        /// If DM fails, it falls back to replying in the channel with the embedded image.</summary>
+        /// <param name="user">The user to send the image to.</param>
+        /// <param name="filePath">The file path of the saved image.</param>
+        /// <param name="planName">The name of the user's subscription plan.</param>
+        /// <param name="maxImagesAllowed">The maximum number of images allowed in the user's gallery based on their plan.</param>
+        /// <param name="userImageCount">The current number of images in the user's gallery.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        private async Task SendImageToUserOrFollowup(SocketGuildUser user, string filePath, string planName, int maxImagesAllowed, int userImageCount)
+        {
+            using FileStream fileStream = new(filePath, FileMode.Open, FileAccess.Read);
+            string filename = Path.GetFileName(filePath).Replace(":", "");
+            EmbedBuilder embed = new EmbedBuilder()
+                .WithTitle("Image Saved Successfully")
+                .WithDescription($"Your image has been added to your gallery. Your **{planName}** plan allows for a maximum of " +
+                    $"**{maxImagesAllowed}** images in your gallery. You now have **{userImageCount}** images. Go to [Hartsy.AI](https://hartsy.ai) " +
+                    "to manage your subscription, or view and download the uncompressed image. Discord will compress images, so it's best to download a copy from " +
+                    "your gallery. However, the image is also available here for your convenience")
+                .WithImageUrl($"attachment://{filename}")
+                .WithColor(Discord.Color.Green)
+                .WithCurrentTimestamp();
+            bool isDmEnabled = false;
+            try
+            {
+                fileStream.Position = 0;
+                FileAttachment fileAttachment = new(fileStream, filename);
+                await user.SendFileAsync(attachment: fileAttachment, embed: embed.Build());
+                isDmEnabled = true;
+            }
+            catch
+            {
+                Console.WriteLine("DM failed, falling back to channel reply.");
+            }
+
+            if (!isDmEnabled)
+            {
+                fileStream.Position = 0;
+                FileAttachment fileAttachment = new(fileStream, filename);
+                await FollowupWithFileAsync(attachment: fileAttachment, embed: embed.Build());
             }
         }
     }

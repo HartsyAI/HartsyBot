@@ -326,41 +326,32 @@ namespace Hartsy.Core
             {
                 stringBuilder.Clear();
                 WebSocketReceiveResult result = await ReceiveMessage(webSocket, stringBuilder, responseBuffer);
-                if (result.MessageType == WebSocketMessageType.Close)
-                    break;
+                if (result.MessageType == WebSocketMessageType.Close) break;
                 string jsonString = stringBuilder.ToString();
-                string logString = ReplaceBase64(jsonString); // Reduces log size by replacing base64 content
-                Console.WriteLine("Response JSON (excluding base64 data): " + logString);
+                string logString = ReplaceBase64(jsonString);
+                Console.WriteLine("Response JSON (excluding base64 data): " + logString); // DEBUG ONLY
                 Dictionary<string, object>? responseData = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonString);
                 bool isFinal = false;
                 foreach (KeyValuePair<string, object> kvp in responseData!)
-                { 
+                {
                     if (responseData != null)
                     {
                         if (kvp.Value is JObject genProgressData)
                         {
                             if (genProgressData.ContainsKey("preview"))
                             {
-                                Console.WriteLine($"\n\nPreview found\n\n");
                                 int batchIndex = Convert.ToInt32(genProgressData["batch_index"]);
                                 string base64WithPrefix = genProgressData["preview"]!.ToString();
-                                string overall = genProgressData["overall_percent"]!.ToString();
-                                string current = genProgressData["current_percent"]!.ToString();
                                 string base64 = await RemovePrefix(base64WithPrefix);
                                 yield return (base64, isFinal, estimatedTimeRemaining.ToString(@"hh\:mm\:ss"));
                             }
                         }
                         if (responseData.TryGetValue("image", out object? value))
                         {
-                            Console.WriteLine($"\n\nImage found\n\n");
                             int batchIndex = Convert.ToInt32(responseData["batch_index"]);
                             string base64WithPrefix = value.ToString()!;
                             string base64 = await RemovePrefix(base64WithPrefix);
-                            // check if image is a gif mark final as true
-                            if (base64WithPrefix.Contains("data:image/gif;base64"))
-                            {
-                                isFinal = true;
-                            }
+                            if (base64WithPrefix.Contains("data:image/gif;base64")) isFinal = true;
                             yield return (base64, isFinal, estimatedTimeRemaining.ToString(@"hh\:mm\:ss"));
                         }
                         if (responseData.TryGetValue("gen_progress", out object? progressData))
@@ -368,19 +359,18 @@ namespace Hartsy.Core
                             JObject? progressDict = progressData as JObject;
                             double overallPercent = (double)progressDict["overall_percent"];
                             double currentPercent = (double)progressDict["current_percent"];
-                            // Reset start time until progress begins
                             if (currentPercent == 0.0)
                             {
                                 startTime = DateTime.UtcNow;
                                 lastPercent = 0;
-                                continue;  // Skip until progress starts
+                                continue;
                             }
                             if (currentPercent > lastPercent)
                             {
                                 TimeSpan timeElapsed = DateTime.UtcNow - startTime;
                                 double percentComplete = currentPercent;
                                 double totalEstimatedTime = timeElapsed.TotalSeconds / percentComplete;
-                                totalEstimatedTime = Math.Min(totalEstimatedTime, 24 * 60 * 60); // Cap at 24 hours
+                                totalEstimatedTime = Math.Min(totalEstimatedTime, 24 * 60 * 60);
                                 estimatedTimeRemaining = TimeSpan.FromSeconds((1 - percentComplete) * totalEstimatedTime);
                                 lastPercent = currentPercent;
                             }

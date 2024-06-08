@@ -97,6 +97,7 @@ namespace HartsyBot
         {
             try
             {
+                await _interactions!.RegisterCommandsGloballyAsync(true); // Clear all global commands
                 // Things to be run when the bot is ready
                 if (_client!.Guilds.Count != 0)
                 {

@@ -376,7 +376,7 @@ namespace Hartsy.Core.SupaBase
         /// <summary>Gets the maximum number of images allowed based on the user's subscription plan.</summary>
         /// <param name="planName"></param>
         /// <returns></returns>
-        public int GetMaxImagesAllowed(string? planName)
+        public static int GetMaxImagesAllowed(string? planName)
         {
             // Replace with actual logic to determine max images allowed based on planName
             return planName switch
