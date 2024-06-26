@@ -2,6 +2,7 @@
 using static Postgrest.Constants;
 using dotenv.net;
 using Hartsy.Core.SupaBase.Models;
+using Supabase.Storage.Interfaces;
 
 namespace Hartsy.Core.SupaBase
 {
@@ -102,10 +103,10 @@ namespace Hartsy.Core.SupaBase
                 }
                 Dictionary<string, object> subStatus = new()
                 {
-                {"PlanName", user.PlanName ?? "No plan"},
-                {"Credits", user.Credit ?? 0},
-                // Add any other subscription info here
-            };
+                    {"PlanName", user.PlanName ?? "No plan"},
+                    {"Credits", user.Credit ?? 0},
+                    // Do we need any other user info?
+                };
                 return subStatus;
             }
             catch (Exception ex)
@@ -116,7 +117,7 @@ namespace Hartsy.Core.SupaBase
         }
 
         /// <summary>Retrieves subscription information for a user by their ID.</summary>
-        /// <param name="userId">The ID of the user to retrieve subscription information for.</param>
+        /// <param name="userId">The Supabase ID of the user to retrieve subscription information for.</param>
         /// <returns>A task that represents the asynchronous operation. The task result contains the subscription object or null if not found.</returns>
         public async Task<Users?> GetSubscriptionByUserId(string userId)
         {
@@ -327,13 +328,13 @@ namespace Hartsy.Core.SupaBase
         {
             try
             {
-                var storage = supabase!.Storage;
+                IStorageClient<Supabase.Storage.Bucket, Supabase.Storage.FileObject> storage = supabase!.Storage;
                 string fileName = Path.GetFileName(imagePath);
                 string storagePath = $"{userId}/{fileName}";
                 byte[] fileContents;
                 using (FileStream stream = File.OpenRead(imagePath))
                 {
-                    using var memoryStream = new MemoryStream();
+                    using MemoryStream memoryStream = new();
                     await stream.CopyToAsync(memoryStream);
                     // rename the file to avoid issues with colons in the filename
                     fileContents = memoryStream.ToArray();

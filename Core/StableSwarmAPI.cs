@@ -336,6 +336,14 @@ namespace Hartsy.Core
                 {
                     if (responseData != null)
                     {
+                        if (responseData.TryGetValue("error", out object? isError))
+                        {
+                            string? error = isError!.ToString();
+                            Console.WriteLine($"Error: {error}");
+                            await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Error occurred during GIF generation", CancellationToken.None);
+                            yield return (string.Empty, false, string.Empty);
+                            yield break;
+                        }
                         if (kvp.Value is JObject genProgressData)
                         {
                             if (genProgressData.ContainsKey("preview"))

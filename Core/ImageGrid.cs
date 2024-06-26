@@ -1,7 +1,6 @@
 ﻿using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Processing;
 using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing.Processors.Filters;
 
 namespace Hartsy.Core
 {
@@ -31,7 +30,7 @@ namespace Hartsy.Core
                 Dictionary<string, string> imageData = imageEntry.Value;
                 try
                 {
-                    if (imageData.TryGetValue("base64", out var base64))
+                    if (imageData.TryGetValue("base64", out string? base64))
                     {
                         byte[] imageBytes = Convert.FromBase64String(base64);
                         using Image<Rgba32> image = Image.Load<Rgba32>(imageBytes);
@@ -112,6 +111,9 @@ namespace Hartsy.Core
             }
         }
 
+        /// <summary>Adds a watermark to the bottom right corner of an image. Used for Showcase submissions.</summary>
+        /// <param name="mainImage">The main image to add the watermark to.</param>
+        /// <returns>The main image with the watermark added to the bottom right corner.</returns>
         public static async Task<Image<Rgba32>> AddWatermarkBottomRight(Image<Rgba32> mainImage)
         {
             Image<Rgba32> watermarkImage;
@@ -128,14 +130,14 @@ namespace Hartsy.Core
                 watermarkImage = await Image.LoadAsync<Rgba32>(watermarkStream);
             }
             // Resize watermark to fit in the bottom right corner
-            int watermarkWidth = mainImage.Width / 5;
+            int watermarkWidth = mainImage.Width / 3;
             int watermarkHeight = watermarkImage.Height * watermarkWidth / watermarkImage.Width;
             watermarkImage.Mutate(x => x.Resize(watermarkWidth, watermarkHeight));
             // Define the position for the watermark (bottom-right corner)
             int xPosition = mainImage.Width - watermarkWidth - 10; // 10px padding
             int yPosition = mainImage.Height - watermarkHeight - 10; // 10px padding
             // Apply the watermark to the main image
-            mainImage.Mutate(ctx => ctx.DrawImage(watermarkImage, new Point(xPosition, yPosition), 1f));
+            mainImage.Mutate(ctx => ctx.DrawImage(watermarkImage, new Point(xPosition, yPosition), 0.4f));
             return mainImage;
         }
     }

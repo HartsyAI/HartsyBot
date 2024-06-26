@@ -2,9 +2,9 @@
 using Discord.WebSocket;
 using Hartsy.Core.SupaBase;
 using Hartsy.Core.SupaBase.Models;
-using Hartsy.Core;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Processing;
 
 namespace Hartsy.Core
 {
@@ -34,6 +34,12 @@ namespace Hartsy.Core
                 // Load the image, add a watermark, and send it to the showcase channel
                 Image<Rgba32> image = await SixLabors.ImageSharp.Image.LoadAsync<Rgba32>(imagePath);
                 Image<Rgba32> watermarkedImage = await ImageGrid.AddWatermarkBottomRight(image);
+                SupabaseClient supaBase = new();
+                Dictionary<string, object>? subStatus = await supaBase.GetSubStatus(user.Id.ToString());
+                if (subStatus != null && subStatus["PlanName"].ToString() == "Free")
+                {
+                    watermarkedImage.Mutate(x => x.Resize(watermarkedImage.Width / 4, watermarkedImage.Height / 4));
+                }
                 string tempFilePath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".jpeg");
                 await watermarkedImage.SaveAsJpegAsync(tempFilePath);
                 using (FileStream fileStream = new(tempFilePath, FileMode.Open))

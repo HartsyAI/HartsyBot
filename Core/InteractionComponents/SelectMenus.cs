@@ -8,7 +8,9 @@ using SixLabors.ImageSharp.Formats.Gif;
 using SixLabors.ImageSharp.Processing.Processors.Quantization;
 using SixLabors.ImageSharp.Processing;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 using Hartsy.Core.SupaBase;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Hartsy.Core.InteractionComponents
 {
@@ -109,6 +111,13 @@ namespace Hartsy.Core.InteractionComponents
                 await FollowupAsync(embed: CreateGalleryFullEmbed(supaUser, maxImagesAllowed, userImageCount), ephemeral: true);
                 return;
             }
+            if (supaUser.PlanName == "Free")
+            {
+                using Image<Rgba32> image = SixLabors.ImageSharp.Image.Load<Rgba32>(filePath);
+                image.Mutate(x => x.Resize(image.Width / 4, image.Height / 4));
+                await ImageGrid.AddWatermarkBottomRight(image);
+                image.SaveAsJpeg(filePath);
+            }
             string url = await supaBase.UploadImage(supaUser.Id!, filePath);
             if (url != null)
             {
@@ -168,10 +177,12 @@ namespace Hartsy.Core.InteractionComponents
                 {"videoboomerang", true},
                 {"video_frames", 25},
                 {"video_fps", 60},
-                {"video_steps", 22},
+                {"video_steps", 40},
                 {"video_cfg", 2.5},
                 {"video_min_cfg", 1},
                 {"video_motion_bucket", 127},
+                //{"exactbackendid", 4 },
+                {"internalbackendtype", "swarmswarmbackend"},
             };
         }
 
@@ -188,6 +199,15 @@ namespace Hartsy.Core.InteractionComponents
         {
             try
             {
+                if (base64String.IsNullOrEmpty())
+                {
+                    await processingMessage.ModifyAsync(msg =>
+                    {
+                        msg.Content = "**There are no GPUs available. Please try again later.**";
+                        msg.Embeds = Array.Empty<Embed>();
+                    });
+                    return;
+                }
                 byte[] imageData = Convert.FromBase64String(base64String);
                 using MemoryStream imageStream = new(imageData);
                 MemoryStream embedStream = new();
@@ -245,32 +265,39 @@ namespace Hartsy.Core.InteractionComponents
         /// <returns>A task representing the asynchronous operation.</returns>
         private static async Task ProcessImageStream(MemoryStream imageStream, MemoryStream embedStream, string suffix, bool isPreview)
         {
-            if (suffix == "jpeg")
+            try
             {
-                using SixLabors.ImageSharp.Image image = SixLabors.ImageSharp.Image.Load(imageStream);
-                if (isPreview)
+                if (suffix == "jpeg")
                 {
-                    image.Mutate(i => i.Resize(1024, 768));
+                    using SixLabors.ImageSharp.Image image = SixLabors.ImageSharp.Image.Load(imageStream);
+                    if (isPreview)
+                    {
+                        image.Mutate(i => i.Resize(1024, 768));
+                    }
+                    await image.SaveAsJpegAsync(embedStream);
                 }
-                await image.SaveAsJpegAsync(embedStream);
-            }
-            else if (suffix == "gif")
-            {
-                using SixLabors.ImageSharp.Image image = SixLabors.ImageSharp.Image.Load(imageStream);
-                if (isPreview)
+                else if (suffix == "gif")
                 {
-                    int newWidth = image.Width * 3;
-                    int newHeight = image.Height * 3;
-                    image.Mutate(x => x.Resize(newWidth, newHeight));
+                    using SixLabors.ImageSharp.Image image = SixLabors.ImageSharp.Image.Load(imageStream);
+                    if (isPreview)
+                    {
+                        int newWidth = image.Width * 3;
+                        int newHeight = image.Height * 3;
+                        image.Mutate(x => x.Resize(newWidth, newHeight));
+                    }
+                    GifEncoder encoder = new() { ColorTableMode = GifColorTableMode.Global, Quantizer = new WebSafePaletteQuantizer() };
+                    await image.SaveAsGifAsync(embedStream, encoder);
                 }
-                GifEncoder encoder = new() { ColorTableMode = GifColorTableMode.Global, Quantizer = new WebSafePaletteQuantizer() };
-                await image.SaveAsGifAsync(embedStream, encoder);
+                else
+                {
+                    await imageStream.CopyToAsync(embedStream);
+                }
+                embedStream.Position = 0;
             }
-            else
+            catch (Exception ex)
             {
-                await imageStream.CopyToAsync(embedStream);
+                Console.WriteLine($"\nAn error occurred: {ex.Message}\n");
             }
-            embedStream.Position = 0;
         }
 
         /// <summary>Creates an embed message indicating the user's current GPUT balance and the expected balance after generating an image. 
@@ -350,6 +377,18 @@ namespace Hartsy.Core.InteractionComponents
             {
                 fileStream.Position = 0;
                 FileAttachment fileAttachment = new(fileStream, filename);
+                Console.WriteLine(planName); // debug
+                if (planName == "free")
+                {
+                    // resize image to low quality for free plan
+                    using Image<Rgba32> image = SixLabors.ImageSharp.Image.Load<Rgba32>(fileStream);
+                    image.Mutate(x => x.Resize(image.Width / 2, image.Height / 2));
+                    image.SaveAsJpeg(fileStream);
+                    fileStream.Position = 0;
+                    await user.SendFileAsync(attachment: fileAttachment, embed: embed.Build());
+                    isDmEnabled = true;
+                    return;
+                }
                 await user.SendFileAsync(attachment: fileAttachment, embed: embed.Build());
                 isDmEnabled = true;
             }
@@ -357,7 +396,6 @@ namespace Hartsy.Core.InteractionComponents
             {
                 Console.WriteLine("DM failed, falling back to channel reply.");
             }
-
             if (!isDmEnabled)
             {
                 fileStream.Position = 0;
