@@ -181,8 +181,8 @@ namespace Hartsy.Core.InteractionComponents
                 {"video_cfg", 2.5},
                 {"video_min_cfg", 1},
                 {"video_motion_bucket", 127},
-                //{"exactbackendid", 4 },
-                {"internalbackendtype", "swarmswarmbackend"},
+                {"exactbackendid", 2 },
+                //{"internalbackendtype", "swarmswarmbackend"},
             };
         }
 
