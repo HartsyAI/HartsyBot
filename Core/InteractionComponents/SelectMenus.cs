@@ -137,9 +137,21 @@ namespace Hartsy.Core.InteractionComponents
         /// <returns>A task representing the asynchronous operation.</returns>
         private async Task GenerateGif(string filePath)
         {
+            // TODO: Remove GPUTs from user's account
+            // TODO: On final image, disable the cancel button and add other buttons.
             string initimage = Convert.ToBase64String(File.ReadAllBytes(filePath));
-            Dictionary<string, object> payload = CreateGifPayload(initimage);
-            RestUserMessage processingMessage = await Context.Channel.SendMessageAsync("Starting GIF generation...");
+            Dictionary<string, object> payload = await CreateGifPayload(initimage);
+            EmbedBuilder startingEmbed = new EmbedBuilder()
+                .WithTitle("GIF Generation")
+                .WithThumbnailUrl(Context.User.GetAvatarUrl() ?? Context.Guild.IconUrl)
+                .WithDescription("Generating a GIF from the selected image. This may take a few minutes.")
+                .WithColor(Discord.Color.Gold)
+                .WithCurrentTimestamp();
+            string userId = Context.User.Id.ToString();
+            string? sessionId = payload.TryGetValue("session_id", out object? sessionIdObj) ? sessionIdObj.ToString() : "";
+            ComponentBuilder components = new ComponentBuilder()
+            .WithButton("Interrupt", customId: $"interrupt_gif:{userId}:{sessionId}", ButtonStyle.Danger);
+            RestUserMessage processingMessage = await Context.Channel.SendMessageAsync(embed: startingEmbed.Build(), components: components.Build());
             await foreach (var (base64String, isFinal, ETR) in stableSwarmAPI.CreateGifAsync(payload))
             {
                 await HandleGifGenerationUpdate(processingMessage, base64String, isFinal, ETR);
@@ -150,10 +162,13 @@ namespace Hartsy.Core.InteractionComponents
         /// image dimensions, video format, and specific settings for GIF creation.</summary>
         /// <param name="initimage">The initial image in Base64 format to be used in the GIF generation.</param>
         /// <returns>A dictionary containing the payload parameters for the GIF generation request.</returns>
-        private static Dictionary<string, object> CreateGifPayload(string initimage)
+        private async Task<Dictionary<string, object>> CreateGifPayload(string initimage)
         {
+            string sessionId = await stableSwarmAPI.GetSession();
+            int motionBucket = new Random().Next(100, 200);
             return new Dictionary<string, object>
             {
+                {"session_id", sessionId},
                 {"prompt", "clear vibrant text"},
                 {"negativeprompt", "blurry"},
                 {"images", 1},
@@ -180,7 +195,7 @@ namespace Hartsy.Core.InteractionComponents
                 {"video_steps", 40},
                 {"video_cfg", 2.5},
                 {"video_min_cfg", 1},
-                {"video_motion_bucket", 127},
+                {"video_motion_bucket", motionBucket}, // 127 is baseline stay between 100-200 
                 {"exactbackendid", 2 },
                 //{"internalbackendtype", "swarmswarmbackend"},
             };
@@ -201,10 +216,20 @@ namespace Hartsy.Core.InteractionComponents
             {
                 if (base64String.IsNullOrEmpty())
                 {
+                    EmbedBuilder errorEmbedBuilder = new EmbedBuilder()
+                    .WithTitle("No GPUs Available")
+                    .WithDescription("**There are no GPUs available.**\n\n" +
+                         "If you are seeing this message, it means this is a non peak time and you need to request GIF gens." +
+                         "To get it activated, please ping @kalebbroo. Once activated, you will be able to generate GIFs again. " +
+                         "We apologize for the inconvenience and appreciate your patience. Keeping the service online when its not " +
+                         "being used is just a waste of money.")
+                    .WithColor(Discord.Color.Red)
+                    .WithFooter("Check back soon or contact support if the issue persists.")
+                    .WithCurrentTimestamp();
+                    Embed errorEmbed = errorEmbedBuilder.Build();
                     await processingMessage.ModifyAsync(msg =>
                     {
-                        msg.Content = "**There are no GPUs available. Please try again later.**";
-                        msg.Embeds = Array.Empty<Embed>();
+                        msg.Embeds = new Embed[] { errorEmbed };
                     });
                     return;
                 }

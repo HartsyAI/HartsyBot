@@ -4,6 +4,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp;
+using Supabase.Gotrue;
 
 namespace Hartsy.Core
 {
@@ -13,6 +14,8 @@ namespace Hartsy.Core
         private readonly string _swarmURL;
         private static int batchCount = 0;
         private const int batchProcessFrequency = 2;
+        /// <summary>Active WebSocket connections in a dictionary of sessionID:WebSocket instance.</summary>
+        private static readonly Dictionary<string, ClientWebSocket> ActiveWebSockets = [];
 
         public StableSwarmAPI()
         {
@@ -78,9 +81,9 @@ namespace Hartsy.Core
             return result;
         }
 
-        /// <summary>Creates a request object with the necessary payload and session ID.</summary>
+        /// <summary>Creates a session ID and removes null values from the payload.</summary>
         /// <param name="payload">The initial payload for the request.</param>
-        /// <returns>A task representing the asynchronous operation. The task result contains the request object as a dictionary.</returns>
+        /// <returns>A dictionary containing the new payload with all null values removed.</returns>
         private async Task<Dictionary<string, object>> CreateRequestObject(Dictionary<string, object> payload)
         {
             payload["session_id"] = await GetSession();
@@ -104,6 +107,8 @@ namespace Hartsy.Core
             ClientWebSocket webSocket = new();
             await EnsureWebSocketConnectionAsync(webSocket);
             Dictionary<string, object> request = await CreateRequestObject(payload);
+            string sessionId = payload["session_id"].ToString() ?? "";
+            ActiveWebSockets[sessionId] = webSocket;
             await SendRequestAsync(webSocket, request);
             ArraySegment<byte> responseBuffer = new(new byte[8192]);
             StringBuilder stringBuilder = new();
@@ -171,7 +176,12 @@ namespace Hartsy.Core
                             if (batchIndex == 3)
                             {
                                 Image<Rgba32> final = await HandleFinal(finalImages, username, messageId);
-                                await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "All final images received", CancellationToken.None);
+                                ActiveWebSockets.Remove(sessionId);
+                                if (webSocket.State == WebSocketState.Open)
+                                {
+                                    await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Cleaning up after generation", CancellationToken.None);
+                                }
+                                webSocket.Dispose();
                                 yield return (final, isFinal);
                                 break;
                             }
@@ -304,9 +314,7 @@ namespace Hartsy.Core
             }
         }
 
-        /// <summary>
-        /// Asynchronously creates a GIF using a WebSocket connection based on provided image data and session configurations.
-        /// </summary>
+        /// <summary>Asynchronously creates a GIF using a WebSocket connection based on provided image data and session configurations.</summary>
         /// <param name="username">The username associated with the request.</param>
         /// <param name="messageId">The message identifier associated with the request.</param>
         /// <param name="payload">The dictionary containing the necessary data and settings for GIF generation.</param>
@@ -315,7 +323,8 @@ namespace Hartsy.Core
         {
             using ClientWebSocket webSocket = new();
             await EnsureWebSocketConnectionAsync(webSocket);
-            payload["session_id"] = await GetSession();
+            string sessionId = payload["session_id"].ToString() ?? "";
+            ActiveWebSockets[sessionId] = webSocket;
             await SendRequestAsync(webSocket, payload);
             ArraySegment<byte> responseBuffer = new(new byte[8192]);
             StringBuilder stringBuilder = new();
@@ -365,7 +374,7 @@ namespace Hartsy.Core
                         if (responseData.TryGetValue("gen_progress", out object? progressData))
                         {
                             JObject? progressDict = progressData as JObject;
-                            double overallPercent = (double)progressDict["overall_percent"];
+                            double overallPercent = (double)progressDict!["overall_percent"];
                             double currentPercent = (double)progressDict["current_percent"];
                             if (currentPercent == 0.0)
                             {
@@ -385,11 +394,55 @@ namespace Hartsy.Core
                         }
                         if (isFinal)
                         {
-                            await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "All final images received", CancellationToken.None);
+                            ActiveWebSockets.Remove(sessionId);
+                            if (webSocket.State == WebSocketState.Open)
+                            {
+                                await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Cleaning up after generation", CancellationToken.None);
+                            }
+                            webSocket.Dispose();
                             break;
                         }
                     }
                 }
+            }
+        }
+
+        /// <summary>Sends an interrupt request to the API to stop the generation process.</summary>
+        /// <returns>A task representing the asynchronous operation. The task result contains a boolean indicating whether the interrupt was successful.</returns>
+        public async Task<bool> InterruptGeneration(string session)
+        {
+            // TODO: This does not need to be a bool, we can just return void
+            try
+            {
+                Dictionary<string, object> payload = new()
+                {
+                    { "session_id", session },
+                    { "other_sessions", false }
+                };
+                string jsonPayload = JsonConvert.SerializeObject(payload);
+                StringContent content = new(jsonPayload, Encoding.UTF8, "application/json");
+                using HttpResponseMessage response = await Client.PostAsync($"{_swarmURL}/API/InterruptAll", content);
+                if (response.IsSuccessStatusCode)
+                {
+                    Console.WriteLine("Generation successfully interrupted.");
+                    ClientWebSocket webSocket = ActiveWebSockets[session];
+                    while (webSocket.State == WebSocketState.Open)
+                    {
+                        await Task.Delay(1000);
+                        await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "User interupted generation", CancellationToken.None);
+                    }
+                    return true;
+                }
+                else
+                {
+                    Console.WriteLine($"Failed to interrupt generation: {response.StatusCode} - {response.ReasonPhrase}");
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in InterruptGeneration: {ex.Message}");
+                return false;
             }
         }
     }

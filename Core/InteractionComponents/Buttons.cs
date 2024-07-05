@@ -2,6 +2,7 @@
 using Discord.WebSocket;
 using Discord;
 using Hartsy.Core.Commands;
+using Hartsy.Core;
 using Hartsy.Core.SupaBase;
 using Hartsy.Core.SupaBase.Models;
 
@@ -258,7 +259,7 @@ namespace Hartsy.Core.InteractionComponents
         [ComponentInteraction("choose_image:*")]
         public async Task ChooseImageButtonHandler(string customId)
         {
-            Console.WriteLine($"Custom ID: {customId}");
+            Console.WriteLine($"Custom ID: {customId}"); // Debugging
             if (ComponentHelpers.IsOnCooldown(Context.User, "choose_image"))
             {
                 await RespondAsync("You are on cooldown. Please wait before trying again.", ephemeral: true);
@@ -360,6 +361,36 @@ namespace Hartsy.Core.InteractionComponents
                 {
                     await RespondAsync("Error: Failed to send a direct message to the user.", ephemeral: true);
                 }
+            }
+        }
+
+        /// <summary>Handles the 'interrupt_gif' button when clicked, sending a request to interrupt the GIF generation process.</summary>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        [ComponentInteraction("interrupt_gif:*")]
+        public async Task HandleInterruptButton(string customId)
+        {
+            // TODO: If the user is not the one who initiated the GIF generation, do not allow the interrupt
+            // TODO: Add a remove button to the message to allow the user to remove the message
+            await DeferAsync();
+            StableSwarmAPI swarmAPI = new();
+            string[] splitCustomId = customId.Split(":");
+            string sessionId = splitCustomId[1];
+            bool interruptSuccess = await swarmAPI.InterruptGeneration(sessionId);
+            EmbedBuilder interruptEmbed = new EmbedBuilder()
+                .WithTitle("GIF Generation Interrupted")
+                .WithDescription("The GIF generation process has been successfully interrupted by the user.")
+                .WithColor(Color.Red)
+                .WithCurrentTimestamp();
+            if (Context.Interaction is SocketMessageComponent message)
+            {
+                ComponentBuilder componentBuilder = new ComponentBuilder()
+                    .WithButton("Interrupt", "interrupt_gif", ButtonStyle.Danger, disabled: true);
+                await message.ModifyOriginalResponseAsync(msg =>
+                {
+                    msg.Content = string.Empty;
+                    msg.Embeds = new[] { interruptEmbed.Build() };
+                    msg.Components = componentBuilder.Build();
+                });
             }
         }
     }

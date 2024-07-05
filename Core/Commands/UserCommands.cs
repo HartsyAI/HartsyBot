@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using Hartsy.Core.SupaBase;
 using Hartsy.Core.SupaBase.Models;
 using Discord.Rest;
+using System.Net.WebSockets;
 
 namespace Hartsy.Core.Commands
 {
@@ -161,7 +162,15 @@ namespace Hartsy.Core.Commands
             // Check if the user has a valid subscription and enough credits
             if (subStatus != null && userInfo.Credit > 0)
             {
-                await _supabaseClient.UpdateUserCredit(user?.Id.ToString() ?? "", credits);
+                int newCredit = credits - 1;
+                // Attempt to update user credit then check if the update was successful before proceeding
+                bool isCreditUpdated = await _supabaseClient.UpdateUserCredit(user?.Id.ToString() ?? "", newCredit);
+                if (!isCreditUpdated)
+                {
+                    Console.WriteLine("Error updating user credits. Aborting image generation.");
+                    await HandleSubscriptionFailure(Context);
+                    return;
+                }
                 Dictionary<string, string> fields = new()
                 {
                     {
@@ -172,7 +181,7 @@ namespace Hartsy.Core.Commands
                 };
                 Embed embed = BuildEmbed(
                     "Image Generation",
-                    $"You have {credits} GPUT. You will have {credits - 1} GPUT after this image is generated.",
+                    $"You have {credits} GPUT. You will have {newCredit} GPUT after this image is generated.",
                     Discord.Color.Gold,
                     "Ask an admin for ways to earn FREE GPUTs!",
                     user!.GetAvatarUrl() ?? user!.GetDefaultAvatarUrl(),

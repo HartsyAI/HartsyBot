@@ -299,9 +299,8 @@ namespace Hartsy.Core.SupaBase
                     Console.WriteLine($"Error updating user credit: {response.ResponseMessage.StatusCode} - {response.ResponseMessage.ReasonPhrase}");
                     return false;
                 }
-                // Retrieve the updated user data
+                // Retrieve the updated user data to verify the credit update
                 Users? updatedUser = await supabase.From<Users>().Where(x => x.ProviderId == userId).Single();
-                // Verify the credit update
                 if (updatedUser != null && updatedUser.Credit == newCredit)
                 {
                     Console.WriteLine($"Successfully verified updated credit for user {userId} to {newCredit}.");
@@ -309,7 +308,21 @@ namespace Hartsy.Core.SupaBase
                 }
                 else
                 {
-                    Console.WriteLine($"Verification failed: Updated credit for user {userId} does not match {newCredit}.");
+                    Console.WriteLine($"Verification failed: Updated credit for user {userId} does not match {newCredit}. Retrying...");
+                    // Retry the update once more
+                    response = await supabase.From<Users>()
+                                             .Where(x => x.ProviderId == userId)
+                                             .Set(x => x.Credit!, newCredit)
+                                             .Update();
+                    if (response.ResponseMessage!.IsSuccessStatusCode)
+                    {
+                        updatedUser = await supabase.From<Users>().Where(x => x.ProviderId == userId).Single();
+                        if (updatedUser != null && updatedUser.Credit == newCredit)
+                        {
+                            Console.WriteLine($"Successfully verified updated credit for user {userId} to {newCredit} on retry.");
+                            return true;
+                        }
+                    }
                     return false;
                 }
             }
