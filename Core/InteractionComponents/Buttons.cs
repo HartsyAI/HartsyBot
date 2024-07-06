@@ -366,16 +366,16 @@ namespace Hartsy.Core.InteractionComponents
 
         /// <summary>Handles the 'interrupt_gif' button when clicked, sending a request to interrupt the GIF generation process.</summary>
         /// <returns>A task representing the asynchronous operation.</returns>
-        [ComponentInteraction("interrupt_gif:*")]
+        [ComponentInteraction("interrupt:*")]
         public async Task HandleInterruptButton(string customId)
         {
             // TODO: If the user is not the one who initiated the GIF generation, do not allow the interrupt
-            // TODO: Add a remove button to the message to allow the user to remove the message
             await DeferAsync();
             StableSwarmAPI swarmAPI = new();
             string[] splitCustomId = customId.Split(":");
+            string userId = splitCustomId[0];
             string sessionId = splitCustomId[1];
-            bool interruptSuccess = await swarmAPI.InterruptGeneration(sessionId);
+            await swarmAPI.InterruptGeneration(sessionId);
             EmbedBuilder interruptEmbed = new EmbedBuilder()
                 .WithTitle("GIF Generation Interrupted")
                 .WithDescription("The GIF generation process has been successfully interrupted by the user.")
@@ -384,7 +384,10 @@ namespace Hartsy.Core.InteractionComponents
             if (Context.Interaction is SocketMessageComponent message)
             {
                 ComponentBuilder componentBuilder = new ComponentBuilder()
-                    .WithButton("Interrupt", "interrupt_gif", ButtonStyle.Danger, disabled: true);
+                    .WithButton("Interrupt", $"interrupt:{userId}:{sessionId}", ButtonStyle.Secondary, disabled: true)
+                    .WithButton("Delete", $"delete:{userId}:{message.Message.Id}", ButtonStyle.Danger)
+                    .WithButton("Regenerate", $"regenerate:{userId}:{message.Message.Id}", ButtonStyle.Success);
+
                 await message.ModifyOriginalResponseAsync(msg =>
                 {
                     msg.Content = string.Empty;

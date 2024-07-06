@@ -408,10 +408,10 @@ namespace Hartsy.Core
         }
 
         /// <summary>Sends an interrupt request to the API to stop the generation process.</summary>
-        /// <returns>A task representing the asynchronous operation. The task result contains a boolean indicating whether the interrupt was successful.</returns>
-        public async Task<bool> InterruptGeneration(string session)
+        /// <param name="session">The session ID of the generation process to be interrupted.</param>
+        /// <returns>A task representing the asynchronous operation.</returns>
+        public async Task InterruptGeneration(string session)
         {
-            // TODO: This does not need to be a bool, we can just return void
             try
             {
                 Dictionary<string, object> payload = new()
@@ -424,25 +424,28 @@ namespace Hartsy.Core
                 using HttpResponseMessage response = await Client.PostAsync($"{_swarmURL}/API/InterruptAll", content);
                 if (response.IsSuccessStatusCode)
                 {
-                    Console.WriteLine("Generation successfully interrupted.");
-                    ClientWebSocket webSocket = ActiveWebSockets[session];
-                    while (webSocket.State == WebSocketState.Open)
+                    Console.WriteLine("Generation successfully interrupted."); // DEBUG ONLY
+                    if (ActiveWebSockets.TryGetValue(session, out ClientWebSocket? webSocket))
                     {
-                        await Task.Delay(1000);
-                        await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "User interupted generation", CancellationToken.None);
+                        while (webSocket.State == WebSocketState.Open)
+                        {
+                            await Task.Delay(1000);
+                            await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "User interupted generation", CancellationToken.None);
+                        }
                     }
-                    return true;
+                    else
+                    {
+                        Console.WriteLine("WebSocket not found in ActiveWebSockets dictionary.");
+                    }
                 }
                 else
                 {
                     Console.WriteLine($"Failed to interrupt generation: {response.StatusCode} - {response.ReasonPhrase}");
-                    return false;
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in InterruptGeneration: {ex.Message}");
-                return false;
             }
         }
     }

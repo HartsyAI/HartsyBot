@@ -11,6 +11,7 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using Hartsy.Core.SupaBase;
 using Microsoft.IdentityModel.Tokens;
+using System.ComponentModel;
 
 namespace Hartsy.Core.InteractionComponents
 {
@@ -150,7 +151,7 @@ namespace Hartsy.Core.InteractionComponents
             string userId = Context.User.Id.ToString();
             string? sessionId = payload.TryGetValue("session_id", out object? sessionIdObj) ? sessionIdObj.ToString() : "";
             ComponentBuilder components = new ComponentBuilder()
-            .WithButton("Interrupt", customId: $"interrupt_gif:{userId}:{sessionId}", ButtonStyle.Danger);
+            .WithButton("Interrupt", customId: $"interrupt:{userId}:{sessionId}", ButtonStyle.Danger);
             RestUserMessage processingMessage = await Context.Channel.SendMessageAsync(embed: startingEmbed.Build(), components: components.Build());
             await foreach (var (base64String, isFinal, ETR) in stableSwarmAPI.CreateGifAsync(payload))
             {
@@ -253,12 +254,30 @@ namespace Hartsy.Core.InteractionComponents
                         .WithText("Powered by Hartsy.AI")
                         .WithIconUrl("https://github.com/kalebbroo/Hartsy/blob/main/images/logo.png?raw=true"))
                     .WithTimestamp(DateTimeOffset.Now);
-                await processingMessage.ModifyAsync(msg =>
+                ComponentBuilder componentBuilder = new();
+                if (isFinal)
                 {
-                    msg.Embeds = new[] { updatedEmbed.Build() };
-                    msg.Content = "";
-                    msg.Attachments = new[] { file };
-                });
+                    componentBuilder
+                        .WithButton("Delete", $"delete:{processingMessage.Author.Id}", ButtonStyle.Danger)
+                        .WithButton("Showcase", $"showcase:{processingMessage.Author.Id}:{processingMessage.Id}", ButtonStyle.Primary)
+                        .WithButton("Add to Gallery", $"add:{processingMessage.Author.Id}:{processingMessage.Id}", ButtonStyle.Primary)
+                        .WithButton("Regenerate", $"regenerate:{processingMessage.Author.Id}", ButtonStyle.Success);
+                    await processingMessage.ModifyAsync(msg =>
+                    {
+                        msg.Embeds = new[] { updatedEmbed.Build() };
+                        msg.Content = "";
+                        msg.Components = componentBuilder.Build();
+                        msg.Attachments = new[] { file };
+                    });
+                }
+                else
+                {
+                    await processingMessage.ModifyAsync(msg =>
+                    {
+                        msg.Embeds = new[] { updatedEmbed.Build() };
+                        msg.Attachments = new[] { file };
+                    });
+                }
             }
             catch (Exception ex)
             {
