@@ -369,12 +369,21 @@ namespace Hartsy.Core.InteractionComponents
         [ComponentInteraction("interrupt:*")]
         public async Task HandleInterruptButton(string customId)
         {
-            // TODO: If the user is not the one who initiated the GIF generation, do not allow the interrupt
-            await DeferAsync();
-            StableSwarmAPI swarmAPI = new();
             string[] splitCustomId = customId.Split(":");
             string userId = splitCustomId[0];
             string sessionId = splitCustomId[1];
+            if (Context.User.Id.ToString() != userId)
+            {
+                Embed embed = new EmbedBuilder()
+                .WithTitle("Error")
+                .WithDescription("You cannot interrupt another user's image.")
+                .WithColor(Color.Red)
+                .Build();
+                await RespondAsync(embed: embed, ephemeral: true);
+                return;
+            }
+            await DeferAsync();
+            StableSwarmAPI swarmAPI = new();
             await swarmAPI.InterruptGeneration(sessionId);
             EmbedBuilder interruptEmbed = new EmbedBuilder()
                 .WithTitle("GIF Generation Interrupted")

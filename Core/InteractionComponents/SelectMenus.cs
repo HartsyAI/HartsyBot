@@ -143,6 +143,7 @@ namespace Hartsy.Core.InteractionComponents
             string initimage = Convert.ToBase64String(File.ReadAllBytes(filePath));
             Dictionary<string, object> payload = await CreateGifPayload(initimage);
             EmbedBuilder startingEmbed = new EmbedBuilder()
+                .WithAuthor(Context.User)
                 .WithTitle("GIF Generation")
                 .WithThumbnailUrl(Context.User.GetAvatarUrl() ?? Context.Guild.IconUrl)
                 .WithDescription("Generating a GIF from the selected image. This may take a few minutes.")
@@ -202,10 +203,8 @@ namespace Hartsy.Core.InteractionComponents
             };
         }
 
-        /// <summary>
-        /// Handles updates during the GIF generation process. Processes the Base64 string of the generated image, 
-        /// determines the image format, resizes if necessary, and updates the progress message with the current status and attached GIF image.
-        /// </summary>
+        /// <summary>Handles updates during the GIF generation process. Processes the Base64 string of the generated image, 
+        /// determines the image format, resizes if necessary, and updates the progress message with the current status and attached GIF image.</summary>
         /// <param name="processingMessage">The message indicating the progress of the GIF generation.</param>
         /// <param name="base64String">The Base64 string of the generated image.</param>
         /// <param name="isFinal">Indicates if the image is the final output.</param>
@@ -241,8 +240,14 @@ namespace Hartsy.Core.InteractionComponents
                 string suffix = GetImageSuffix(imageStream);
                 await ProcessImageStream(imageStream, embedStream, suffix, !isFinal);
                 FileAttachment file = new(embedStream, $"new_image.{suffix}");
+                SocketTextChannel? channel = processingMessage.Channel as SocketTextChannel;
+                SocketGuild guild = channel!.Guild;
+                string username = processingMessage.Embeds.First().Author!.Value.Name;
+                SocketGuildUser? user = guild.Users.FirstOrDefault(u => u.Username == username);
+                string userId = user!.Id.ToString();
+                Console.WriteLine($"User: {user.Username}"); // debug
                 EmbedBuilder updatedEmbed = new EmbedBuilder()
-                    //.WithAuthor($"{processingMessage.Author.GlobalName}", $"{processingMessage.Author.GetAvatarUrl}", "https://hartsy.ai")
+                    .WithAuthor(user)
                     .WithTitle("✨ GIF Generation in Progress...")
                     .WithThumbnailUrl($"https://github.com/kalebbroo/Hartsy/blob/main/images/logo.png?raw=true")
                     .WithImageUrl($"attachment://new_image.{suffix}")
@@ -258,10 +263,11 @@ namespace Hartsy.Core.InteractionComponents
                 if (isFinal)
                 {
                     componentBuilder
-                        .WithButton("Delete", $"delete:{processingMessage.Author.Id}", ButtonStyle.Danger)
-                        .WithButton("Showcase", $"showcase:{processingMessage.Author.Id}:{processingMessage.Id}", ButtonStyle.Primary)
-                        .WithButton("Add to Gallery", $"add:{processingMessage.Author.Id}:{processingMessage.Id}", ButtonStyle.Primary)
-                        .WithButton("Regenerate", $"regenerate:{processingMessage.Author.Id}", ButtonStyle.Success);
+                        .WithButton("Showcase", $"choose_image:showcase:{userId}", ButtonStyle.Primary)
+                        .WithButton("Save to Gallery", $"choose_image:save:{userId}", ButtonStyle.Primary)
+                        //.WithButton("Regenerate", $"regenerate:{userId}", ButtonStyle.Success) // TODO: Implement regenerate
+                        .WithButton("Report", $"report:{userId}", ButtonStyle.Secondary, emote: new Emoji("\u26A0")) // ⚠
+                        .WithButton(" ", $"delete:{userId}", ButtonStyle.Danger, emote: new Emoji("\uD83D\uDDD1")); // 🗑
                     await processingMessage.ModifyAsync(msg =>
                     {
                         msg.Embeds = new[] { updatedEmbed.Build() };
