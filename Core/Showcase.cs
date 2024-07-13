@@ -5,6 +5,7 @@ using Hartsy.Core.SupaBase.Models;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Processing;
+using Hartsy.Core.ImageUtil;
 
 namespace Hartsy.Core
 {
@@ -31,6 +32,7 @@ namespace Hartsy.Core
                 .Build();
             try
             {
+                // TODO: Check for GIF and handle it differently
                 // Load the image, add a watermark, and send it to the showcase channel
                 Image<Rgba32> image = await SixLabors.ImageSharp.Image.LoadAsync<Rgba32>(imagePath);
                 Image<Rgba32> watermarkedImage = await ImageGrid.AddWatermarkBottomRight(image);
@@ -45,7 +47,6 @@ namespace Hartsy.Core
                 using (FileStream fileStream = new(tempFilePath, FileMode.Open))
                 {
                     string filename = Path.GetFileName(tempFilePath);
-                    filename = filename.Replace(":", "_");
                     Console.WriteLine($"Showcasing image: {filename}"); // Debugging
                     Embed embed = new EmbedBuilder()
                         .WithTitle("Showcase Image")

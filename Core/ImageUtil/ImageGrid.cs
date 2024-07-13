@@ -2,7 +2,7 @@
 using SixLabors.ImageSharp.Processing;
 using SixLabors.ImageSharp.PixelFormats;
 
-namespace Hartsy.Core
+namespace Hartsy.Core.ImageUtil
 {
     public class ImageGrid
     {
@@ -38,14 +38,14 @@ namespace Hartsy.Core
                         byte[] imageBytes = Convert.FromBase64String(base64);
                         using Image<Rgba32> image = Image.Load<Rgba32>(imageBytes);
                         // Calculate x and y based on index to arrange in 2x2 grid
-                        int x = (index % 2) * imageWidth * multiplier;
-                        int y = (index / 2) * imageHeight * multiplier;
+                        int x = index % 2 * imageWidth * multiplier;
+                        int y = index / 2 * imageHeight * multiplier;
                         if (isPreview)
                         {
                             image.Mutate(i => i.Resize(imageWidth * multiplier, imageHeight * multiplier));
                         }
                         gridImage.Mutate(ctx => ctx.DrawImage(image, new Point(x, y), 1f));
-                        await SaveImageAsync(image, username, messageId, index);
+                        await ImageHelpers.SaveImageAsync(image, username, messageId, index);
                     }
                 }
                 catch (Exception ex)
@@ -60,24 +60,6 @@ namespace Hartsy.Core
             }
             // Clone the gridImage to avoid disposal issues
             return gridImage.Clone();
-        }
-
-        /// <summary>Saves an image asynchronously to a specified directory.</summary>
-        /// <param name="image">The image to save.</param>
-        /// <param name="username">The username associated with the image.</param>
-        /// <param name="messageId">The message ID associated with the image.</param>
-        /// <param name="imageIndex">The index of the image in the batch.</param>
-        /// <returns>A task representing the asynchronous operation.</returns>
-        private static async Task SaveImageAsync(Image<Rgba32> image, string username, ulong messageId, int imageIndex)
-        {
-            // Check if the image is a final image based on its width
-            if (image.Width == 1024)
-            {
-                string directoryPath = Path.Combine(Directory.GetCurrentDirectory(), $"../../../images/{username}/{messageId}/");
-                Directory.CreateDirectory(directoryPath);  // Ensure the directory exists
-                string filePath = Path.Combine(directoryPath, $"{messageId}:image_{imageIndex}.jpeg");
-                await image.SaveAsJpegAsync(filePath);
-            }
         }
 
         /// <summary>Adds a semi-transparent watermark to the bottom right corner of each quadrant in a grid image.</summary>

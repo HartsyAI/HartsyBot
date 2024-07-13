@@ -298,12 +298,23 @@ namespace Hartsy.Core.InteractionComponents
                     SocketMessageComponent? interaction = Context.Interaction as SocketMessageComponent;
                     string username = interaction!.User.Username;
                     ulong messageId = interaction!.Message.Id;
-                    SelectMenuBuilder selectMenu = new SelectMenuBuilder()
+                    SelectMenuBuilder selectMenu = new();
+                    Console.WriteLine($"Title: {interaction.Message.Embeds.FirstOrDefault()?.Title}"); // Debugging
+                    if ((type == "showcase" || type == "save") && interaction.Message.Embeds.FirstOrDefault()?.Title == "✨ GIF Generation Completed!")
+                    {
+                        selectMenu = new SelectMenuBuilder()
+                            .WithPlaceholder("Confirm GIF Selection")
+                            .AddOption("Selected GIF", "new_image.gif");
+                    }
+                    else
+                    {
+                        selectMenu = new SelectMenuBuilder()
                             .WithPlaceholder("Select an image")
-                            .AddOption("Image 1", "image_0")
-                            .AddOption("Image 2", "image_1")
-                            .AddOption("Image 3", "image_2")
-                            .AddOption("Image 4", "image_3");
+                            .AddOption("Image 1", "image_0.jpeg")
+                            .AddOption("Image 2", "image_1.jpeg")
+                            .AddOption("Image 3", "image_2.jpeg")
+                            .AddOption("Image 4", "image_3.jpeg");
+                    }
                     if (type == "i2i")
                     {
                         selectMenu.WithCustomId($"select_image:i2i:{userId}:{messageId}");

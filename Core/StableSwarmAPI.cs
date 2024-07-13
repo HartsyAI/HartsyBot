@@ -5,6 +5,7 @@ using Newtonsoft.Json.Linq;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp;
 using Supabase.Gotrue;
+using Hartsy.Core.ImageUtil;
 
 namespace Hartsy.Core
 {

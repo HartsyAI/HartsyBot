@@ -11,7 +11,7 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using Hartsy.Core.SupaBase;
 using Microsoft.IdentityModel.Tokens;
-using System.ComponentModel;
+using Hartsy.Core.ImageUtil;
 
 namespace Hartsy.Core.InteractionComponents
 {
@@ -41,7 +41,7 @@ namespace Hartsy.Core.InteractionComponents
                     await RespondWithError("Selection Error", "Error: You cannot select another user's image.");
                     return;
                 }
-                string filePath = Path.Combine(Directory.GetCurrentDirectory(), $"../../../images/{Context.User.Username}/{messageId}/{messageId}:{selectedValue}.jpeg");
+                string filePath = Path.Combine(Directory.GetCurrentDirectory(), $"../../../images/{Context.User.Username}/{messageId}/{messageId}-{selectedValue}");
                 if (!File.Exists(filePath))
                 {
                     await FollowupAsync("Error: Image not found.", ephemeral: true);
@@ -246,9 +246,10 @@ namespace Hartsy.Core.InteractionComponents
                 SocketGuildUser? user = guild.Users.FirstOrDefault(u => u.Username == username);
                 string userId = user!.Id.ToString();
                 Console.WriteLine($"User: {user.Username}"); // debug
+                // TODO: Add Template and Text to the embed so the regen button can be used
                 EmbedBuilder updatedEmbed = new EmbedBuilder()
                     .WithAuthor(user)
-                    .WithTitle("✨ GIF Generation in Progress...")
+                    .WithTitle(isFinal ? "✨ GIF Generation Completed!" : "✨ GIF Generation in Progress...")
                     .WithThumbnailUrl($"https://github.com/kalebbroo/Hartsy/blob/main/images/logo.png?raw=true")
                     .WithImageUrl($"attachment://new_image.{suffix}")
                     .WithColor(isFinal ? Discord.Color.Green : Discord.Color.Red)
@@ -262,6 +263,8 @@ namespace Hartsy.Core.InteractionComponents
                 ComponentBuilder componentBuilder = new();
                 if (isFinal)
                 {
+                    Image<Rgba32> image = SixLabors.ImageSharp.Image.Load<Rgba32>(imageData);
+                    await ImageHelpers.SaveImageAsync(image, username, processingMessage.Id, 5, "gif");
                     componentBuilder
                         .WithButton("Showcase", $"choose_image:showcase:{userId}", ButtonStyle.Primary)
                         .WithButton("Save to Gallery", $"choose_image:save:{userId}", ButtonStyle.Primary)
