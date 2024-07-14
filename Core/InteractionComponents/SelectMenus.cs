@@ -116,7 +116,7 @@ namespace Hartsy.Core.InteractionComponents
             {
                 using Image<Rgba32> image = SixLabors.ImageSharp.Image.Load<Rgba32>(filePath);
                 image.Mutate(x => x.Resize(image.Width / 4, image.Height / 4));
-                await ImageGrid.AddWatermarkBottomRight(image);
+                await ImageHelpers.AddWatermarkBottomRight(image);
                 image.SaveAsJpeg(filePath);
             }
             string url = await supaBase.UploadImage(supaUser.Id!, filePath);

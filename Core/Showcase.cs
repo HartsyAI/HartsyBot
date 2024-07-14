@@ -35,7 +35,7 @@ namespace Hartsy.Core
                 // TODO: Check for GIF and handle it differently
                 // Load the image, add a watermark, and send it to the showcase channel
                 Image<Rgba32> image = await SixLabors.ImageSharp.Image.LoadAsync<Rgba32>(imagePath);
-                Image<Rgba32> watermarkedImage = await ImageGrid.AddWatermarkBottomRight(image);
+                Image<Rgba32> watermarkedImage = await ImageHelpers.AddWatermarkBottomRight(image);
                 SupabaseClient supaBase = new();
                 Dictionary<string, object>? subStatus = await supaBase.GetSubStatus(user.Id.ToString());
                 if (subStatus != null && subStatus["PlanName"].ToString() == "Free")
