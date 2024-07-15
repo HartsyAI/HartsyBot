@@ -12,6 +12,7 @@ using SixLabors.ImageSharp.PixelFormats;
 using Hartsy.Core.SupaBase;
 using Microsoft.IdentityModel.Tokens;
 using Hartsy.Core.ImageUtil;
+using SixLabors.ImageSharp.Formats.Webp;
 
 namespace Hartsy.Core.InteractionComponents
 {
@@ -338,7 +339,28 @@ namespace Hartsy.Core.InteractionComponents
                         int newHeight = image.Height * 3;
                         image.Mutate(x => x.Resize(newWidth, newHeight));
                     }
-                    GifEncoder encoder = new() { ColorTableMode = GifColorTableMode.Global, Quantizer = new WebSafePaletteQuantizer() };
+                    // save the webp to the image folder
+                    string webpPath = Path.Combine(Directory.GetCurrentDirectory(), $"../../../images/image.webp");
+                    // Configure the WebP encoder
+                    //WebpEncoder webpEncoder = new()
+                    //{
+                    //    Quality = 100,
+                    //    FileFormat = WebpFileFormatType.Lossless,
+                    //};
+                    //// Check if the image is animated
+                    //if (image.Frames.Count > 1)
+                    //{
+                    //    Console.WriteLine("Animated Webp");
+                    //}
+                    //await image.SaveAsWebpAsync(webpPath, webpEncoder);
+                    //await image.SaveAsync(webpPath);
+                    
+                    GifEncoder encoder = new() 
+                    { 
+                        ColorTableMode = GifColorTableMode.Global,
+                        Quantizer = new WebSafePaletteQuantizer(),
+                        SkipMetadata = true,
+                    };
                     await image.SaveAsGifAsync(embedStream, encoder);
                 }
                 else

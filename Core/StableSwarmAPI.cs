@@ -338,7 +338,7 @@ namespace Hartsy.Core
                 WebSocketReceiveResult result = await ReceiveMessage(webSocket, stringBuilder, responseBuffer);
                 if (result.MessageType == WebSocketMessageType.Close) break;
                 string jsonString = stringBuilder.ToString();
-                string logString = ReplaceBase64(jsonString);
+                string logString = ReplaceBase64(jsonString); // DEBUG ONLY
                 Console.WriteLine("Response JSON (excluding base64 data): " + logString); // DEBUG ONLY
                 Dictionary<string, object>? responseData = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonString);
                 bool isFinal = false;

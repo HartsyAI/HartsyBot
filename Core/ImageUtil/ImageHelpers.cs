@@ -32,6 +32,12 @@ namespace Hartsy.Core.ImageUtil
                 case "gif":
                     await image.SaveAsGifAsync(filePath);
                     break;
+                case "png":
+                    await image.SaveAsPngAsync(filePath);
+                    break;
+                case "webp":
+                    await image.SaveAsWebpAsync(filePath);
+                    break;
                 default:
                     await image.SaveAsJpegAsync(filePath);
                     break;
