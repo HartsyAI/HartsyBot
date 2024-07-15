@@ -92,6 +92,7 @@ namespace Hartsy.Core.ImageUtil
         /// <returns>The main image with the watermark added to the bottom right corner.</returns>
         public static async Task<Image<Rgba32>> AddWatermarkBottomRight(Image<Rgba32> mainImage)
         {
+            // TODO: THIS NEEDS TO BE REFACTORED. THIS SUCKS.
             Image<Rgba32> watermarkImage;
             // Load the watermark image from a file or URL
             if (File.Exists(watermarkPath))
