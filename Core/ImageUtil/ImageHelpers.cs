@@ -1,4 +1,5 @@
 ﻿using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Gif;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 
@@ -44,7 +45,7 @@ namespace Hartsy.Core.ImageUtil
         /// <param name="gridImage">The grid image to add the watermark to.</param>
         /// <param name="watermarkImagePath">The path to the watermark image.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
-        public static async Task AddWatermark(Image<Rgba32> gridImage)
+        public static async Task AddWatermarkGrid(Image<Rgba32> gridImage)
         {
             try
             {
@@ -113,6 +114,69 @@ namespace Hartsy.Core.ImageUtil
             // Apply the watermark to the main image
             mainImage.Mutate(ctx => ctx.DrawImage(watermarkImage, new Point(xPosition, yPosition), 0.4f));
             return mainImage;
+        }
+
+        /// <summary>Adds a watermark to every frame of an animated GIF and returns the modified image as a memory stream.</summary>
+        /// <param name="imagePath">Path to the original GIF image.</param>
+        /// <returns>A memory stream containing the watermarked GIF.</returns>
+        public static async Task<MemoryStream> AddWatermarkToGifAsync(string imagePath)
+        {
+            MemoryStream ms = new();
+            using Image<Rgba32> originalImage = await Image.LoadAsync<Rgba32>(imagePath);
+            Image<Rgba32> watermarkImage = await LoadWatermarkImageAsync();
+            // Create a list to store the modified frames
+            List<Image<Rgba32>> modifiedFrames = [];
+            foreach (ImageFrame<Rgba32> frame in originalImage.Frames)
+            {
+                // Create a new image from the frame data
+                Image<Rgba32> frameImage = new(frame.Width, frame.Height);
+                // Copy pixel data from the original frame to the new image
+                frameImage.Frames[0].DangerousTryGetSinglePixelMemory(out Memory<Rgba32> memory);
+                frame.DangerousTryGetSinglePixelMemory(out Memory<Rgba32> frameMemory);
+                frameMemory.CopyTo(memory);
+                ApplyWatermarkDirectlyToImage(frameImage, watermarkImage);
+                // Add the processed frame to the list
+                modifiedFrames.Add(frameImage);
+            }
+            // Create a new image to hold the frames with watermarks
+            using var newImage = new Image<Rgba32>(originalImage.Width, originalImage.Height);
+            foreach (var modifiedFrame in modifiedFrames)
+            {
+                newImage.Frames.AddFrame(modifiedFrame.Frames[0]);
+            }
+            // Save the new animated GIF to the memory stream
+            newImage.SaveAsGif(ms);
+            ms.Position = 0;
+            return ms;
+        }
+
+        /// <summary>Applies a watermark directly to an image.</summary>
+        /// <param name="image">The image to apply the watermark to.</param>
+        /// <param name="watermarkImage">The watermark image.</param>
+        private static void ApplyWatermarkDirectlyToImage(Image<Rgba32> image, Image<Rgba32> watermarkImage)
+        {
+            int watermarkWidth = image.Width / 5;
+            int watermarkHeight = watermarkImage.Height * watermarkWidth / watermarkImage.Width;
+            watermarkImage.Mutate(x => x.Resize(watermarkWidth, watermarkHeight));
+            int xPosition = image.Width - watermarkWidth - 10;
+            int yPosition = image.Height - watermarkHeight - 10;
+            image.Mutate(ctx => ctx.DrawImage(watermarkImage, new Point(xPosition, yPosition), 0.5f)); // Apply 50% opacity
+        }
+
+        /// <summary>Loads the watermark image from a file or URL.</summary>
+        /// <returns>The loaded watermark image.</returns>
+        private static async Task<Image<Rgba32>> LoadWatermarkImageAsync()
+        {
+            if (File.Exists(watermarkPath))
+            {
+                return await Image.LoadAsync<Rgba32>(watermarkPath);
+            }
+            else
+            {
+                using HttpClient httpClient = new();
+                Stream watermarkStream = await httpClient.GetStreamAsync(watermarkUrl);
+                return await Image.LoadAsync<Rgba32>(watermarkStream);
+            }
         }
     }
 }

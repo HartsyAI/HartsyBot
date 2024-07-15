@@ -193,8 +193,8 @@ namespace Hartsy.Core.InteractionComponents
                 {"videoresolution", "image"},
                 {"videoboomerang", true},
                 {"video_frames", 25},
-                {"video_fps", 60},
-                {"video_steps", 40},
+                {"video_fps", 80},
+                {"video_steps", 25},
                 {"video_cfg", 2.5},
                 {"video_min_cfg", 1},
                 {"video_motion_bucket", motionBucket}, // 127 is baseline stay between 100-200 

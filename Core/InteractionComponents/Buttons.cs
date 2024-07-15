@@ -161,12 +161,9 @@ namespace Hartsy.Core.InteractionComponents
                 await RespondAsync("Error: You cannot delete another users image.", ephemeral: true);
                 return;
             }
-
             await DeferAsync();
             SocketMessageComponent? interaction = Context.Interaction as SocketMessageComponent;
-            // Delete the original message
             await interaction?.Message.DeleteAsync()!;
-            // Respond with a followup message
             await FollowupAsync("Message deleted successfully", ephemeral: true);
         }
 
@@ -405,7 +402,7 @@ namespace Hartsy.Core.InteractionComponents
             {
                 ComponentBuilder componentBuilder = new ComponentBuilder()
                     .WithButton("Interrupt", $"interrupt:{userId}:{sessionId}", ButtonStyle.Secondary, disabled: true)
-                    .WithButton("Delete", $"delete:{userId}:{message.Message.Id}", ButtonStyle.Danger)
+                    .WithButton("Delete", $"delete:{userId}", ButtonStyle.Danger)
                     .WithButton("Regenerate", $"regenerate:{userId}:{message.Message.Id}", ButtonStyle.Success);
 
                 await message.ModifyOriginalResponseAsync(msg =>

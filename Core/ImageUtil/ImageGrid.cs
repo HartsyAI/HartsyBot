@@ -52,7 +52,7 @@ namespace Hartsy.Core.ImageUtil
             }
             if (!isPreview)
             {
-                await ImageHelpers.AddWatermark(gridImage);
+                await ImageHelpers.AddWatermarkGrid(gridImage);
                 gridImage.Mutate(i => i.Resize(gridWidth / 3, gridHeight / 3));
             }
             // Clone the gridImage to avoid disposal issues

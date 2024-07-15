@@ -6,6 +6,7 @@ using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Processing;
 using Hartsy.Core.ImageUtil;
+using Image = SixLabors.ImageSharp.Image;
 
 namespace Hartsy.Core
 {
@@ -32,35 +33,74 @@ namespace Hartsy.Core
                 .Build();
             try
             {
-                // TODO: Check for GIF and handle it differently
-                // Load the image, add a watermark, and send it to the showcase channel
-                Image<Rgba32> image = await SixLabors.ImageSharp.Image.LoadAsync<Rgba32>(imagePath);
-                Image<Rgba32> watermarkedImage = await ImageHelpers.AddWatermarkBottomRight(image);
-                SupabaseClient supaBase = new();
-                Dictionary<string, object>? subStatus = await supaBase.GetSubStatus(user.Id.ToString());
-                if (subStatus != null && subStatus["PlanName"].ToString() == "Free")
+                ImageInfo imageInfo;
+                using (var imageStream = File.OpenRead(imagePath))
                 {
-                    watermarkedImage.Mutate(x => x.Resize(watermarkedImage.Width / 4, watermarkedImage.Height / 4));
+                    imageInfo = await Image.IdentifyAsync(imageStream);
                 }
-                string tempFilePath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".jpeg");
-                await watermarkedImage.SaveAsJpegAsync(tempFilePath);
-                using (FileStream fileStream = new(tempFilePath, FileMode.Open))
+                if (imageInfo == null)
                 {
-                    string filename = Path.GetFileName(tempFilePath);
-                    Console.WriteLine($"Showcasing image: {filename}"); // Debugging
-                    Embed embed = new EmbedBuilder()
-                        .WithTitle("Showcase Image")
-                        .WithDescription($"Submitted by {user.Username}")
-                        .WithThumbnailUrl(user.GetAvatarUrl() ?? user.GetDefaultAvatarUrl())
-                        .WithImageUrl($"attachment://{filename}")
-                        .AddField("Upvotes", "None", true)
-                        .WithFooter("Total Votes: 0")
-                        .Build();
-                    FileAttachment fileAttachment = new(fileStream, filename);
-                    IUserMessage message = await showcaseChannel.SendFileAsync(attachment: fileAttachment, text: null, embed: embed, components: components);
-                    await showcaseChannel.CreateThreadAsync($"Chat about {user.Username}'s Showcased image!", autoArchiveDuration: ThreadArchiveDuration.OneDay, message: message);
+                    Console.WriteLine("Error: Unable to determine image format.");
+                    return;
                 }
-                File.Delete(tempFilePath);
+                if (imageInfo.Metadata.GetGifMetadata() != null)
+                {
+                    // Handle GIF with watermark
+                    MemoryStream gifStream = await ImageHelpers.AddWatermarkToGifAsync(imagePath);
+                    string tempFilePath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".gif");
+                    using (var fileStream = new FileStream(tempFilePath, FileMode.Create, FileAccess.Write))
+                    {
+                        gifStream.WriteTo(fileStream);
+                    }
+                    using (FileStream fileStream = new(tempFilePath, FileMode.Open))
+                    {
+                        string filename = Path.GetFileName(tempFilePath);
+                        Console.WriteLine($"Showcasing GIF: {filename}"); // Debugging
+                        Embed embed = new EmbedBuilder()
+                            .WithTitle("Showcase GIF")
+                            .WithDescription($"Submitted by {user.Username}")
+                            .WithThumbnailUrl(user.GetAvatarUrl() ?? user.GetDefaultAvatarUrl())
+                            .WithImageUrl($"attachment://{filename}")
+                            .AddField("Upvotes", "None", true)
+                            .WithFooter("Total Votes: 0")
+                            .Build();
+                        FileAttachment fileAttachment = new(fileStream, filename);
+                        IUserMessage message = await showcaseChannel.SendFileAsync(attachment: fileAttachment, text: null, embed: embed, components: components);
+                        await showcaseChannel.CreateThreadAsync($"Chat about {user.Username}'s Showcased GIF!", autoArchiveDuration: ThreadArchiveDuration.OneDay, message: message);
+                    }
+                    File.Delete(tempFilePath);
+                }
+                else
+                {
+                    // Load the image, add a watermark, and send it to the showcase channel
+                    Image<Rgba32> image = await SixLabors.ImageSharp.Image.LoadAsync<Rgba32>(imagePath);
+                    Image<Rgba32> watermarkedImage = await ImageHelpers.AddWatermarkBottomRight(image);
+                    SupabaseClient supaBase = new();
+                    Dictionary<string, object>? subStatus = await supaBase.GetSubStatus(user.Id.ToString());
+                    if (subStatus != null && subStatus["PlanName"].ToString() == "Free")
+                    {
+                        watermarkedImage.Mutate(x => x.Resize(watermarkedImage.Width / 4, watermarkedImage.Height / 4));
+                    }
+                    string tempFilePath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".jpeg");
+                    await watermarkedImage.SaveAsJpegAsync(tempFilePath);
+                    using (FileStream fileStream = new(tempFilePath, FileMode.Open))
+                    {
+                        string filename = Path.GetFileName(tempFilePath);
+                        Console.WriteLine($"Showcasing image: {filename}"); // Debugging
+                        Embed embed = new EmbedBuilder()
+                            .WithTitle("Showcase Image")
+                            .WithDescription($"Submitted by {user.Username}")
+                            .WithThumbnailUrl(user.GetAvatarUrl() ?? user.GetDefaultAvatarUrl())
+                            .WithImageUrl($"attachment://{filename}")
+                            .AddField("Upvotes", "None", true)
+                            .WithFooter("Total Votes: 0")
+                            .Build();
+                        FileAttachment fileAttachment = new(fileStream, filename);
+                        IUserMessage message = await showcaseChannel.SendFileAsync(attachment: fileAttachment, text: null, embed: embed, components: components);
+                        await showcaseChannel.CreateThreadAsync($"Chat about {user.Username}'s Showcased image!", autoArchiveDuration: ThreadArchiveDuration.OneDay, message: message);
+                    }
+                    File.Delete(tempFilePath);
+                }
             }
             catch (Exception ex)
             {
