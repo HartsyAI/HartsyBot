@@ -16,7 +16,7 @@ namespace Hartsy.Core
         private static int batchCount = 0;
         private const int batchProcessFrequency = 2;
         /// <summary>Active WebSocket connections in a dictionary of sessionID:WebSocket instance.</summary>
-        private static readonly Dictionary<string, ClientWebSocket> ActiveWebSockets = [];
+        protected static readonly Dictionary<string, ClientWebSocket> ActiveWebSockets = [];
 
         public StableSwarmAPI()
         {

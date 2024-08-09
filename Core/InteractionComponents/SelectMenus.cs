@@ -199,7 +199,7 @@ namespace Hartsy.Core.InteractionComponents
                 {"video_cfg", 2.5},
                 {"video_min_cfg", 1},
                 {"video_motion_bucket", motionBucket}, // 127 is baseline stay between 100-200 
-                {"exactbackendid", 2 },
+                {"exactbackendid", 1 },
                 //{"internalbackendtype", "swarmswarmbackend"},
             };
         }
