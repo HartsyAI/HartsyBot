@@ -7,6 +7,7 @@ using Hartsy.Core.SupaBase;
 using Hartsy.Core.SupaBase.Models;
 using Discord.Rest;
 using System.Net.WebSockets;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace Hartsy.Core.Commands
 {
@@ -369,6 +370,173 @@ namespace Hartsy.Core.Commands
                 .WithButton("Image2Image", i2iCustomId, ButtonStyle.Secondary, row: 1)
                 .WithButton("Add To My Gallery", saveCustomId, ButtonStyle.Primary, row: 1)
                 .WithButton("Generate GIF", gifCustomId, ButtonStyle.Success, row: 1);
+        }
+
+        /// <summary>Generates an image based on the provided prompt using the Flux Schnell model, consuming GPUTs in the process.</summary>
+        /// <param name="prompt">The text to inspire the image creation.</param>
+        /// <param name="aspect">The aspect ratio for the generated image.</param>
+        /// <param name="description">Additional details to enhance the prompt.</param>
+        [SlashCommand("flux", "Images with FLUX! THIS WILL USE GPUTs")]
+        public async Task FluxGenerationCommand(
+            [Summary("Prompt", "What do you want to generate?")] string prompt,
+            [Summary("Aspect", "Choose the aspect ratio")]
+            [Choice("1:1 (1024x1024)", "1:1")]
+            [Choice("4:3 (1024x768)", "4:3")]
+            [Choice("3:2 (1216x832)", "3:2")]
+            [Choice("8:5 (1280x800)", "8:5")]
+            [Choice("16:9 (1344x768)", "16:9")]
+            [Choice("21:9 (1536x640)", "21:9")]
+            [Choice("3:4 (768x1024)", "3:4")]
+            [Choice("2:3 (832x1216)", "2:3")]
+            [Choice("5:8 (800x1280)", "5:8")]
+            [Choice("9:16 (768x1344)", "9:16")]
+            [Choice("9:21 (640x1536)", "9:21")]
+            string aspect)
+        {
+            await DeferAsync(ephemeral: true);
+            SocketGuildUser user = (SocketGuildUser)Context.User;
+            Users? userInfo = await _supabaseClient.GetUserByDiscordId(user?.Id.ToString() ?? "");
+            if (userInfo == null)
+            {
+                await HandleSubscriptionFailure(Context);
+                return;
+            }
+            string subStatus = userInfo.PlanName ?? "Member";
+            int credits = userInfo.Credit ?? 0;
+            // Check if the user has a valid subscription and enough credits
+            if (subStatus != null && userInfo.Credit > 0)
+            {
+                int newCredit = credits - 1;
+                // Attempt to update user credit then check if the update was successful before proceeding
+                bool isCreditUpdated = await _supabaseClient.UpdateUserCredit(user?.Id.ToString() ?? "", newCredit);
+                if (!isCreditUpdated)
+                {
+                    Console.WriteLine("Error updating user credits. Aborting image generation.");
+                    await HandleSubscriptionFailure(Context);
+                    return;
+                }
+                Dictionary<string, string> fields = new()
+                {
+                    {
+                        "Flux Generation Command",
+                        "This command allows you to create images based on the prompt you provide using the Flux Schnell model. Each generation will consume one GPUT from your account." +
+                        "\n\nGo to [Hartsy.ai](https://hartsy.ai) to check your subscription status or add more GPUTs."
+                    }
+                };
+                Embed embed = BuildEmbed(
+                    "Flux Schnell Image Generation",
+                    $"You have {credits} GPUT. You will have {newCredit} GPUT after this image is generated.",
+                    Discord.Color.Gold,
+                    "Ask an admin for ways to earn FREE GPUTs!",
+                    user!.GetAvatarUrl() ?? user!.GetDefaultAvatarUrl(),
+                    fields
+                    ).Build();
+                await FollowupAsync(embed: embed, ephemeral: true);
+                // Add the role to the user if they do not have it
+                await AddSubRole(user, subStatus);
+                SocketTextChannel? channel = Context.Channel as SocketTextChannel;
+                // Proceed with image generation
+                await GenerateForFlux(prompt, aspect, channel, user);
+            }
+            else
+            {
+                // Handle the lack of subscription or insufficient credits
+                Console.WriteLine("Warning: User does not have a valid subscription or enough credits.");
+                await HandleSubscriptionFailure(Context);
+            }
+        }
+
+        /// <summary>Generates images from flux.</summary>
+        public async Task GenerateForFlux(string prompt, string aspect, SocketTextChannel? channel, SocketGuildUser? user)
+        {
+            string username = user!.Username;
+            (int width, int height) = ConvertAspectRatio(aspect);
+            Embed? embed = null;
+            Dictionary<string, object>? payload = null;
+            embed = new EmbedBuilder()
+                .WithAuthor(user)
+                .WithTitle("Thank you for generating your image with Hartsy.AI")
+                .WithDescription($"Generating an image based on the prompt provided by **{username}**\n\n" +
+                                 $"**Model Used:** Flux Schnell\n\n")
+                .WithImageUrl("https://github.com/kalebbroo/Hartsy/blob/main/images/wait.gif?raw=true")
+                .WithThumbnailUrl("https://r2.fluxaiimagegenerator.com/static/schnell.webp")
+                .WithColor(Discord.Color.Red)
+                .WithCurrentTimestamp()
+                .Build();
+
+            // Construct the payload
+            payload = new Dictionary<string, object>
+            {
+                {"prompt", prompt},
+                {"negativeprompt", ""},
+                {"images", 1},
+                {"batchsize", 4},
+                {"donotsave", true},
+                {"model", "flux1-schnell-bnb-nf4"},
+                {"width", width},
+                {"height", height},
+                {"cfgscale", 1},
+                {"steps", 4},
+                {"seed", -1},
+                {"exactbackendid", 3 },
+            };
+            RestUserMessage previewMsg = await channel!.SendMessageAsync(embed: embed);
+            ulong messageId = previewMsg.Id;
+            await foreach (var (image, isFinal) in _stableSwarmAPI.GetImages(payload!, username, messageId))
+            {
+                if (image == null)
+                {
+                    continue;
+                }
+                using MemoryStream ms = new();
+                image.SaveAsJpeg(ms);
+                ms.Position = 0;
+                FileAttachment file = new(ms, "image_grid.jpeg");
+                EmbedBuilder updatedEmbed = previewMsg.Embeds.FirstOrDefault()?.ToEmbedBuilder() ?? new EmbedBuilder();
+                updatedEmbed.WithImageUrl($"attachment://image_grid.jpeg");
+                updatedEmbed.WithColor(Discord.Color.Red);
+                if (isFinal)
+                {
+                    updatedEmbed.WithDescription($"Generated an image for **{username}**\n\n**Prompt:** {prompt}\n\n**Aspect Ratio:** {aspect}" +
+                    $"\n\n**Model Used:** Flux Schnell\n\n**Click Save to Gallery button to see the full-size image**");
+                    updatedEmbed.WithFooter("Click Save to Gallery button to see the full-size image");
+                    updatedEmbed.WithColor(Discord.Color.Green);
+                    await previewMsg.ModifyAsync(m =>
+                    {
+                        m.Embed = updatedEmbed.Build();
+                        m.Attachments = new[] { file };
+                        m.Components = new Optional<MessageComponent>(GenerateComponents(user.Id).Build());
+                    });
+                    break; // Exit the loop after handling the final image
+                }
+                else
+                {
+                    await previewMsg.ModifyAsync(m =>
+                    {
+                        m.Embed = updatedEmbed.Build();
+                        m.Attachments = new[] { file };
+                    });
+                }
+            }
+        }
+
+        private (int width, int height) ConvertAspectRatio(string aspect)
+        {
+            return aspect switch
+            {
+                "1:1" => (1024, 1024),
+                "4:3" => (1152, 896),
+                "3:2" => (1216, 832),
+                "8:5" => (1216, 768),
+                "16:9" => (1344, 768),
+                "21:9" => (1536, 640),
+                "3:4" => (896, 1152),
+                "2:3" => (832, 1216),
+                "5:8" => (768, 1216),
+                "9:16" => (768, 1344),
+                "9:21" => (640, 1536),
+                _ => (1024, 768) // Default if aspect ratio doesn't match
+            };
         }
     }
 }
