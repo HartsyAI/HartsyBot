@@ -6,8 +6,6 @@ using Newtonsoft.Json.Linq;
 using Hartsy.Core.SupaBase;
 using Hartsy.Core.SupaBase.Models;
 using Discord.Rest;
-using System.Net.WebSockets;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace Hartsy.Core.Commands
 {
@@ -327,15 +325,17 @@ namespace Hartsy.Core.Commands
                 updatedEmbed.WithColor(Discord.Color.Red);
                 if (isFinal)
                 {
-                    updatedEmbed.WithDescription($"Generated an image for **{username}**\n\n**Text:** {text}\n\n**Extra Description:** {description}" +
-                        $"\n\n**Template Used:** {templateName}\n\n`{TemplateInfo}`\n\n**Click Save to Gallery button to see the fullsize image**");
-                    updatedEmbed.WithFooter("Click Save to Gallery button to see the fullsize image");
-                    updatedEmbed.WithColor(Discord.Color.Green);
+                    updatedEmbed.AddField("Text", text)
+                    .AddField("Description", description)
+                    .AddField("Template", templateName)
+                    .AddField("TemplateInfo", TemplateInfo)
+                    .WithFooter("Click Save to Gallery button to see the fullsize image")
+                    .WithColor(Discord.Color.Green);
                     await previewMsg.ModifyAsync(m =>
                     {
                         m.Embed = updatedEmbed.Build();
                         m.Attachments = new[] { file };
-                        m.Components = new Optional<MessageComponent>(GenerateComponents(user.Id).Build());
+                        m.Components = new Optional<MessageComponent>(GenerateComponents(user.Id, "template").Build()); // Add generation type to custom ID
                     });
                     break; // Exit the loop after handling the final image
                 }
@@ -353,9 +353,9 @@ namespace Hartsy.Core.Commands
         /// <summary>Generates a set of interactive components (buttons) for message responses, allowing users to interact with the bot's features.</summary>
         /// <param name="userId">The user ID to associate with the components, used for identifying the user in interaction handlers.</param>
         /// <returns>A ComponentBuilder containing buttons for various bot functionalities like regenerate, showcase, report, and saving images.</returns>
-        private static ComponentBuilder GenerateComponents(ulong userId)
+        private static ComponentBuilder GenerateComponents(ulong userId, string type = "")
         {
-            string customId = $"regenerate:{userId}";
+            string customId = $"regenerate:{userId}:{type}";
             string deleteCustomId = $"delete:{userId}";
             string showcaseCustomId = $"choose_image:showcase:{userId}";
             string reportCustomId = $"report:{userId}";
@@ -497,15 +497,15 @@ namespace Hartsy.Core.Commands
                 updatedEmbed.WithColor(Discord.Color.Red);
                 if (isFinal)
                 {
-                    updatedEmbed.WithDescription($"Generated an image for **{username}**\n\n**Prompt:** {prompt}\n\n**Aspect Ratio:** {aspect}" +
-                    $"\n\n**Model Used:** Flux Schnell\n\n**Click Save to Gallery button to see the full-size image**");
-                    updatedEmbed.WithFooter("Click Save to Gallery button to see the full-size image");
-                    updatedEmbed.WithColor(Discord.Color.Green);
+                    updatedEmbed.AddField("Prompt", prompt, true)
+                        .AddField("AspectRatio", aspect, true)
+                        .WithFooter("Click Save to Gallery button to see the full-size image")
+                        .WithColor(Discord.Color.Green);
                     await previewMsg.ModifyAsync(m =>
                     {
                         m.Embed = updatedEmbed.Build();
                         m.Attachments = new[] { file };
-                        m.Components = new Optional<MessageComponent>(GenerateComponents(user.Id).Build());
+                        m.Components = new Optional<MessageComponent>(GenerateComponents(user.Id, "flux").Build()); // Add generation type to custom ID
                     });
                     break; // Exit the loop after handling the final image
                 }

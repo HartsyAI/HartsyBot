@@ -5,6 +5,8 @@ using Hartsy.Core.Commands;
 using Hartsy.Core;
 using Hartsy.Core.SupaBase;
 using Hartsy.Core.SupaBase.Models;
+using Supabase.Gotrue;
+using System.Threading.Channels;
 
 namespace Hartsy.Core.InteractionComponents
 {
@@ -84,17 +86,23 @@ namespace Hartsy.Core.InteractionComponents
             }
         }
 
-        /// <summary>Handles the interaction when the 'regenerate' button is clicked, regenerating the image based on the original parameters.</summary>
-        /// <param name="customId">The custom ID associated with the button that triggered the interaction.</param>
-        /// <returns>A task representing the asynchronous operation.</returns>
         [ComponentInteraction("regenerate:*")]
         public async Task RegenerateButtonHandler(string customId)
         {
             await DeferAsync();
-            if (Context.User.Id.ToString() != customId)
+            var parts = customId.Split(':');
+            if (parts.Length < 2)
             {
-                Console.WriteLine("Another user tried to click a button");
-                await FollowupAsync("Error: You cannot regenerate another users image.", ephemeral: true);
+                Console.WriteLine("Invalid customId format.");
+                await FollowupAsync("Error: Invalid custom ID.", ephemeral: true);
+                return;
+            }
+            string userId = parts[0];
+            string generationType = parts[1];
+            if (Context.User.Id.ToString() != userId)
+            {
+                Console.WriteLine("Another user tried to click a button.");
+                await FollowupAsync("Error: You cannot regenerate another user's image.", ephemeral: true);
                 return;
             }
             if (ComponentHelpers.IsOnCooldown(Context.User, "regenerate"))
@@ -105,43 +113,47 @@ namespace Hartsy.Core.InteractionComponents
             SocketUserMessage? message = (Context.Interaction as SocketMessageComponent)?.Message;
             if (message == null || message.Embeds.Count == 0)
             {
-                Console.WriteLine("Message or embeds are null/empty");
+                Console.WriteLine("Message or embeds are null/empty.");
                 await FollowupAsync("Error: Message or embeds are missing.", ephemeral: true);
                 return;
             }
             Embed embed = message.Embeds.First();
-            var (text, description, template) = ComponentHelpers.ParseEmbed(embed);
+            var fields = embed.Fields.ToDictionary(f => f.Name, f => f.Value);
             SocketTextChannel? channel = Context.Channel as SocketTextChannel;
             SocketGuildUser? user = Context.User as SocketGuildUser;
-            Users? userInfo = await supaBase.GetUserByDiscordId(user?.Id.ToString() ?? "");
-            if (userInfo == null)
+            switch (generationType.ToLower())
             {
-                Console.WriteLine("userInfo is null - User not found in database.");
-                await UserCommands.HandleSubscriptionFailure(Context);
-                // TODO: Move HandleSubscriptionFailure to a shared helper method
-                return;
-            }
-            string? subStatus = userInfo.PlanName;
-            if (subStatus == null || userInfo.Credit <= 0)
-            {
-                Console.WriteLine($"Subscription status or credit issue. Status: {subStatus}, Credits: {userInfo.Credit}");
-                await UserCommands.HandleSubscriptionFailure(Context);
-                // TODO: Move HandleSubscriptionFailure to a shared helper method
+                case "template":
+                    string? text = fields["Text"];
+                    string? description = fields["Description"];
+                    string? template = fields["Template"];
+                    await commands.GenerateFromTemplate(text, template, channel, user, description);
+                    break;
 
-                return;
+                case "flux":
+                    string? prompt = fields["Prompt"];
+                    string? aspect = fields["AspectRatio"];
+                    await commands.GenerateForFlux(prompt, aspect, channel, user);
+                    break;
+
+                case "gif":
+                    StableSwarmAPI swarmAPI = new();
+                    string? suffix = fields["Suffix"];
+                    Dictionary<string, object> payload = new()
+                    {
+                        { "userId", userId },
+                        { "messageId", message.Id },
+                        { "channelId", channel.Id },
+                        { "generationType", generationType }
+                    };
+                    //await swarmAPI.CreateGifAsync(payload);
+                    break;
+
+                default:
+                    Console.WriteLine($"Unknown generation type: {generationType}");
+                    await FollowupAsync("Error: Unknown generation type.", ephemeral: true);
+                    break;
             }
-            int credits = userInfo.Credit ?? 0;
-            await supaBase.UpdateUserCredit(user?.Id.ToString() ?? "", credits - 1);
-            Embed creditEmbed = new EmbedBuilder()
-                    .WithTitle("Image Generation")
-                    .WithDescription($"You have {credits} GPUT. You will have {credits - 1} GPUT after this image is generated.")
-                    .AddField("Generate Command", "This command allows you to generate images based on the text and template you provide. " +
-                    "Each generation will use one GPUT from your account.\n\nGo to [Hartsy.ai](https://hartsy.ai) to check sub status or add GPUTs")
-                    .WithColor(Discord.Color.Gold)
-                    .WithCurrentTimestamp()
-                    .Build();
-            await FollowupAsync(embed: creditEmbed, ephemeral: true);
-            await commands.GenerateFromTemplate(text, template, channel, user, description);
         }
 
         /// <summary>Handles the interaction when the 'delete' button is clicked, removing the associated message.</summary>

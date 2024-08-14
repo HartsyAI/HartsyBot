@@ -269,7 +269,7 @@ namespace Hartsy.Core.InteractionComponents
                     componentBuilder
                         .WithButton("Showcase", $"choose_image:showcase:{userId}", ButtonStyle.Primary)
                         .WithButton("Save to Gallery", $"choose_image:save:{userId}", ButtonStyle.Primary)
-                        //.WithButton("Regenerate", $"regenerate:{userId}", ButtonStyle.Success) // TODO: Implement regenerate
+                        .WithButton("Regenerate", $"regenerate:{userId}:gif", ButtonStyle.Success)
                         .WithButton("Report", $"report:{userId}", ButtonStyle.Secondary, emote: new Emoji("\u26A0")) // ⚠
                         .WithButton(" ", $"delete:{userId}", ButtonStyle.Danger, emote: new Emoji("\uD83D\uDDD1")); // 🗑
                     await processingMessage.ModifyAsync(msg =>
