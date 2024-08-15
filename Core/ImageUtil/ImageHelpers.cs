@@ -1,4 +1,5 @@
 ﻿using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.Formats.Gif;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
@@ -184,6 +185,72 @@ namespace Hartsy.Core.ImageUtil
                 Stream watermarkStream = await httpClient.GetStreamAsync(watermarkUrl);
                 return await Image.LoadAsync<Rgba32>(watermarkStream);
             }
+        }
+
+        public static string ExtractFirstFrame(string gifFilePath)
+        {
+            if (string.IsNullOrEmpty(gifFilePath))
+            {
+                Console.WriteLine("Error: The provided GIF file path is null or empty.");
+                return string.Empty;
+            }
+            string firstFrameFilePath = Path.Combine(Path.GetTempPath(), $"{Path.GetFileNameWithoutExtension(gifFilePath)}_first_frame.png");
+            try
+            {
+                using Image<Rgba32> gifImage = Image.Load<Rgba32>(gifFilePath);
+                if (gifImage.Frames.Count == 0)
+                {
+                    Console.WriteLine("Error: The GIF does not contain any frames.");
+                    return string.Empty;
+                }
+                Image<Rgba32> firstFrame = gifImage.Frames.CloneFrame(0);
+                firstFrame.Save(firstFrameFilePath);
+                Console.WriteLine($"First frame extracted and saved to: {firstFrameFilePath}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error extracting the first frame: {ex.Message}");
+                return string.Empty;
+            }
+            return firstFrameFilePath;
+        }
+
+        public static async Task<string?> DownloadFileFromEmbedAsync(string fileUrl, string fileExtension = "gif")
+        {
+            if (string.IsNullOrEmpty(fileUrl))
+            {
+                Console.WriteLine("Error: The provided file URL is null or empty.");
+                return null;
+            }
+            string tempFilePath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.{fileExtension}");
+            try
+            {
+                using HttpClient httpClient = new();
+                byte[] fileData = await httpClient.GetByteArrayAsync(fileUrl);
+                if (fileData == null || fileData.Length == 0)
+                {
+                    Console.WriteLine("Error: The downloaded file data is null or empty.");
+                    return null;
+                }
+                await File.WriteAllBytesAsync(tempFilePath, fileData);
+                Console.WriteLine($"File downloaded and saved to: {tempFilePath}");
+            }
+            catch (HttpRequestException httpRequestException)
+            {
+                Console.WriteLine($"Error downloading file: {httpRequestException.Message}");
+                return null;
+            }
+            catch (IOException ioException)
+            {
+                Console.WriteLine($"Error saving file: {ioException.Message}");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Unexpected error: {ex.Message}");
+                return null;
+            }
+            return tempFilePath;
         }
     }
 }

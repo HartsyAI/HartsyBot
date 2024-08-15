@@ -137,27 +137,65 @@ namespace Hartsy.Core.InteractionComponents
         /// modifying the progress message with the current status and the generated GIF.</summary>
         /// <param name="filePath">The file path of the image to be converted into a GIF.</param>
         /// <returns>A task representing the asynchronous operation.</returns>
-        private async Task GenerateGif(string filePath)
+        public async Task GenerateGif(string filePath, SocketInteractionContext? context = null)
         {
-            // TODO: Remove GPUTs from user's account
-            // TODO: On final image, disable the cancel button and add other buttons.
-            string initimage = Convert.ToBase64String(File.ReadAllBytes(filePath));
-            Dictionary<string, object> payload = await CreateGifPayload(initimage);
-            EmbedBuilder startingEmbed = new EmbedBuilder()
-                .WithAuthor(Context.User)
-                .WithTitle("GIF Generation")
-                .WithThumbnailUrl(Context.User.GetAvatarUrl() ?? Context.Guild.IconUrl)
-                .WithDescription("Generating a GIF from the selected image. This may take a few minutes.")
-                .WithColor(Discord.Color.Gold)
-                .WithCurrentTimestamp();
-            string userId = Context.User.Id.ToString();
-            string? sessionId = payload.TryGetValue("session_id", out object? sessionIdObj) ? sessionIdObj.ToString() : "";
-            ComponentBuilder components = new ComponentBuilder()
-            .WithButton("Interrupt", customId: $"interrupt:{userId}:{sessionId}", ButtonStyle.Danger);
-            RestUserMessage processingMessage = await Context.Channel.SendMessageAsync(embed: startingEmbed.Build(), components: components.Build());
-            await foreach (var (base64String, isFinal, ETR) in stableSwarmAPI.CreateGifAsync(payload))
+            if (string.IsNullOrEmpty(filePath))
             {
-                await HandleGifGenerationUpdate(processingMessage, base64String, isFinal, ETR);
+                Console.WriteLine("Error: The provided file path is null or empty.");
+                return;
+            }
+            if (!File.Exists(filePath))
+            {
+                Console.WriteLine($"Error: The file does not exist at the specified path: {filePath}");
+                return;
+            }
+            try
+            {
+                string initImage = Convert.ToBase64String(File.ReadAllBytes(filePath));
+                Dictionary<string, object> payload = await CreateGifPayload(initImage);
+                SocketInteractionContext Context = context ?? this.Context;
+                if (Context == null)
+                {
+                    Console.WriteLine("Error: Context is null.");
+                    return;
+                }
+                if (Context.User == null)
+                {
+                    Console.WriteLine("Error: Context.User is null.");
+                    return;
+                }
+                string avatarUrl = Context.User.GetAvatarUrl() ?? Context.Guild?.IconUrl;
+                if (avatarUrl == null)
+                {
+                    Console.WriteLine("Error: Both avatarUrl and Guild.IconUrl are null.");
+                    return;
+                }
+                EmbedBuilder startingEmbed = new EmbedBuilder()
+                    .WithAuthor(Context.User)
+                    .WithTitle("GIF Generation")
+                    .WithThumbnailUrl(avatarUrl)
+                    .WithDescription("Generating a GIF from the selected image. This may take a few minutes.")
+                    .WithColor(Discord.Color.Gold)
+                    .WithCurrentTimestamp();
+                string userId = Context.User.Id.ToString();
+                string? sessionId = payload.TryGetValue("session_id", out object? sessionIdObj) ? sessionIdObj?.ToString() : string.Empty;
+                if (sessionId == null)
+                {
+                    Console.WriteLine("Error: session_id is null.");
+                    return;
+                }
+                ComponentBuilder components = new ComponentBuilder()
+                    .WithButton("Interrupt", customId: $"interrupt:{userId}:{sessionId}", ButtonStyle.Danger);
+                RestUserMessage processingMessage = await Context.Channel.SendMessageAsync(embed: startingEmbed.Build(), components: components.Build());
+                await foreach (var (base64String, isFinal, ETR) in stableSwarmAPI.CreateGifAsync(payload))
+                {
+                    await HandleGifGenerationUpdate(processingMessage, base64String, isFinal, ETR);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in GenerateGif: {ex.Message}");
+                Console.WriteLine($"Stack Trace: {ex.StackTrace}");
             }
         }
 
@@ -172,7 +210,7 @@ namespace Hartsy.Core.InteractionComponents
             return new Dictionary<string, object>
             {
                 {"session_id", sessionId},
-                {"prompt", "clear vibrant text"},
+                {"prompt", "flowing fluid motion action scene"},
                 {"negativeprompt", "blurry"},
                 {"images", 1},
                 {"donotsave", true},
@@ -200,7 +238,6 @@ namespace Hartsy.Core.InteractionComponents
                 {"video_min_cfg", 1},
                 {"video_motion_bucket", motionBucket}, // 127 is baseline stay between 100-200 
                 {"exactbackendid", 3 },
-                //{"internalbackendtype", "swarmswarmbackend"},
             };
         }
 

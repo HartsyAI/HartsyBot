@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using Hartsy.Core.SupaBase;
 using Hartsy.Core.SupaBase.Models;
 using Discord.Rest;
+using Hartsy.Core.InteractionComponents;
 
 namespace Hartsy.Core.Commands
 {
@@ -520,7 +521,7 @@ namespace Hartsy.Core.Commands
             }
         }
 
-        private (int width, int height) ConvertAspectRatio(string aspect)
+        private static (int width, int height) ConvertAspectRatio(string aspect)
         {
             return aspect switch
             {

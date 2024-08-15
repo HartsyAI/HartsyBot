@@ -2,11 +2,10 @@
 using Discord.WebSocket;
 using Discord;
 using Hartsy.Core.Commands;
-using Hartsy.Core;
 using Hartsy.Core.SupaBase;
 using Hartsy.Core.SupaBase.Models;
-using Supabase.Gotrue;
-using System.Threading.Channels;
+using Hartsy.Core.ImageUtil;
+using Microsoft.VisualBasic;
 
 namespace Hartsy.Core.InteractionComponents
 {
@@ -129,26 +128,39 @@ namespace Hartsy.Core.InteractionComponents
                     string? template = fields["Template"];
                     await commands.GenerateFromTemplate(text, template, channel, user, description);
                     break;
-
                 case "flux":
                     string? prompt = fields["Prompt"];
                     string? aspect = fields["AspectRatio"];
                     await commands.GenerateForFlux(prompt, aspect, channel, user);
                     break;
-
                 case "gif":
-                    StableSwarmAPI swarmAPI = new();
-                    string? suffix = fields["Suffix"];
-                    Dictionary<string, object> payload = new()
+                    string gifUrl = embed.Image?.Url ?? string.Empty;
+                    if (string.IsNullOrEmpty(gifUrl))
                     {
-                        { "userId", userId },
-                        { "messageId", message.Id },
-                        { "channelId", channel.Id },
-                        { "generationType", generationType }
-                    };
-                    //await swarmAPI.CreateGifAsync(payload);
-                    break;
+                        Console.WriteLine("GIF URL is null or empty.");
+                        await FollowupAsync("Error: GIF URL is missing.", ephemeral: true);
+                        return;
+                    }
+                    string? gifFilePath = await ImageHelpers.DownloadFileFromEmbedAsync(gifUrl, "gif");
+                    if (string.IsNullOrEmpty(gifFilePath))
+                    {
+                        Console.WriteLine("Failed to download the GIF.");
+                        await FollowupAsync("Error: Failed to download GIF.", ephemeral: true);
+                        return;
+                    }
+                    string? firstFrameFilePath = ImageHelpers.ExtractFirstFrame(gifFilePath);
+                    if (string.IsNullOrEmpty(firstFrameFilePath))
+                    {
+                        Console.WriteLine("Failed to extract the first frame from the GIF.");
+                        await FollowupAsync("Error: Failed to extract the first frame from the GIF.", ephemeral: true);
+                        return;
+                    }
+                    StableSwarmAPI stableSwarmAPI = new();
 
+                    SelectMenus selectMenus = new(commands, supaBase, stableSwarmAPI);
+                    SocketInteractionContext context = Context;
+                    await selectMenus.GenerateGif(firstFrameFilePath, context);
+                    break;
                 default:
                     Console.WriteLine($"Unknown generation type: {generationType}");
                     await FollowupAsync("Error: Unknown generation type.", ephemeral: true);
