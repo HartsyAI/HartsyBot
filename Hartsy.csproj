@@ -9,11 +9,11 @@
 
     <ItemGroup>
 	    <PackageReference Include="dotenv.net" Version="*" />
-	    <PackageReference Include="Discord.Net" Version="3.15.0" />
+	    <PackageReference Include="Discord.Net" Version="3.15.3" />
 	    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
-	    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.4" />
+	    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.5" />
 	    <PackageReference Include="supabase-csharp" Version="0.16.2" />
-	    <PackageReference Include="System.Drawing.Common" Version="8.0.6" />
+	    <PackageReference Include="System.Drawing.Common" Version="8.0.8" />
     </ItemGroup>
 
     <ItemGroup>

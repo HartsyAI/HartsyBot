@@ -4,7 +4,6 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp;
-using Supabase.Gotrue;
 using Hartsy.Core.ImageUtil;
 
 namespace Hartsy.Core
@@ -244,7 +243,7 @@ namespace Hartsy.Core
         private static async Task<Image<Rgba32>?> HandlePreview(Dictionary<int, Dictionary<string, string>> previewImages,
             int batchCount, string username, ulong messageId)
         {
-            if (batchCount % batchProcessFrequency == 0)
+            if (batchCount % batchProcessFrequency == 2)
             {
                 Image<Rgba32> gridImage = await ImageGrid.CreateGridAsync(previewImages, username, messageId);
                 return gridImage;

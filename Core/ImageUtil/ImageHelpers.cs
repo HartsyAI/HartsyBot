@@ -1,6 +1,4 @@
 ﻿using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats;
-using SixLabors.ImageSharp.Formats.Gif;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 
@@ -46,7 +44,7 @@ namespace Hartsy.Core.ImageUtil
         }
 
         private static readonly string watermarkPath = "../../../images/logo.png";
-        private static readonly string watermarkUrl = "https://github.com/kalebbroo/Hartsy/blob/main/images/logo.png?raw=true";
+        private static readonly string watermarkUrl = "https://github.com/kalebbroo/HartsyBot/blob/main/images/logo.png?raw=true";
 
         /// <summary>Adds a semi-transparent watermark to the bottom right corner of each quadrant in a grid image.</summary>
         /// <param name="gridImage">The grid image to add the watermark to.</param>

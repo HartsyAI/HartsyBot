@@ -89,7 +89,7 @@ namespace Hartsy.Core.InteractionComponents
         public async Task RegenerateButtonHandler(string customId)
         {
             await DeferAsync();
-            var parts = customId.Split(':');
+            string[] parts = customId.Split(':');
             if (parts.Length < 2)
             {
                 Console.WriteLine("Invalid customId format.");
@@ -156,7 +156,6 @@ namespace Hartsy.Core.InteractionComponents
                         return;
                     }
                     StableSwarmAPI stableSwarmAPI = new();
-
                     SelectMenus selectMenus = new(commands, supaBase, stableSwarmAPI);
                     SocketInteractionContext context = Context;
                     await selectMenus.GenerateGif(firstFrameFilePath, context);

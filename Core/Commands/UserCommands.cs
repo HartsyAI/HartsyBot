@@ -6,7 +6,6 @@ using Newtonsoft.Json.Linq;
 using Hartsy.Core.SupaBase;
 using Hartsy.Core.SupaBase.Models;
 using Discord.Rest;
-using Hartsy.Core.InteractionComponents;
 
 namespace Hartsy.Core.Commands
 {
@@ -257,19 +256,21 @@ namespace Hartsy.Core.Commands
             string username = user!.Username;
             Embed? embed = null;
             Dictionary<string, object>? payload = null;
+            string cleanedTemplateName = templateName.Replace("`", "");
             Dictionary<string, Template>? templates = await _supabaseClient.GetTemplatesAsync();
-            if (templates != null && templates.TryGetValue(templateName, out Template? templateDetails))
+            if (templates != null && templates.TryGetValue(cleanedTemplateName, out Template? templateDetails))
             {
                 string positiveText = templateDetails.Positive?.Replace("__TEXT_REPLACE__", text) ?? "";
                 prompt = $"{positiveText}, {description}";
                 TemplateInfo = templateDetails?.Description ?? "";
-                imageUrl = templateDetails?.ImageUrl ?? "";
+                imageUrl = templateDetails?.ImageUrl ?? "https://github.com/kalebbroo/HartsyBot/blob/main/images/logo.png?raw=true";
                 embed = new EmbedBuilder()
                     .WithAuthor(user)
                     .WithTitle("Thank you for generating your image with Hartsy.AI")
-                    .WithDescription($"Generating an image described by **{username}**\n\n" +
-                                     $"**Template Used:** {templateName}\n\n`{TemplateInfo}`\n\n")
-                    .WithImageUrl("https://github.com/kalebbroo/Hartsy/blob/main/images/wait.gif?raw=true")
+                    .WithDescription($"Generating an image described by **{username}**\n\n")
+                    .AddField("Template", "`" + templateName + "`")
+                    .AddField("Template Description", "`" + TemplateInfo + "`")
+                    .WithImageUrl("https://github.com/kalebbroo/HartsyBot/blob/main/images/wait.gif?raw=true")
                     .WithThumbnailUrl(imageUrl)
                     .WithColor(Discord.Color.Red)
                     .WithCurrentTimestamp()
@@ -309,7 +310,7 @@ namespace Hartsy.Core.Commands
                         {"init_image_creativity", 0.7},
                     };
             }
-            RestUserMessage previewMsg = await channel!.SendMessageAsync(embed: embed);
+            RestUserMessage previewMsg = await channel!.SendMessageAsync(text: " ", embed: embed);
             ulong messageId = previewMsg.Id;
             await foreach (var (image, isFinal) in _stableSwarmAPI.GetImages(payload!, username, messageId))
             {
@@ -326,17 +327,15 @@ namespace Hartsy.Core.Commands
                 updatedEmbed.WithColor(Discord.Color.Red);
                 if (isFinal)
                 {
-                    updatedEmbed.AddField("Text", text)
-                    .AddField("Description", description)
-                    .AddField("Template", templateName)
-                    .AddField("TemplateInfo", TemplateInfo)
+                    updatedEmbed.AddField("Text", string.IsNullOrEmpty(text) ? "No text provided" : $"`{text}`")
+                    .AddField("Description", string.IsNullOrEmpty(description) ? "`None`" : $"`{description}`")
                     .WithFooter("Click Save to Gallery button to see the fullsize image")
                     .WithColor(Discord.Color.Green);
                     await previewMsg.ModifyAsync(m =>
                     {
                         m.Embed = updatedEmbed.Build();
                         m.Attachments = new[] { file };
-                        m.Components = new Optional<MessageComponent>(GenerateComponents(user.Id, "template").Build()); // Add generation type to custom ID
+                        m.Components = new Optional<MessageComponent>(GenerateComponents(user.Id, "template").Build());
                     });
                     break; // Exit the loop after handling the final image
                 }
@@ -459,7 +458,7 @@ namespace Hartsy.Core.Commands
                 .WithTitle("Thank you for generating your image with Hartsy.AI")
                 .WithDescription($"Generating an image based on the prompt provided by **{username}**\n\n" +
                                  $"**Model Used:** Flux Schnell\n\n")
-                .WithImageUrl("https://github.com/kalebbroo/Hartsy/blob/main/images/wait.gif?raw=true")
+                .WithImageUrl("https://github.com/kalebbroo/HartsyBot/blob/main/images/wait.gif?raw=true")
                 .WithThumbnailUrl("https://r2.fluxaiimagegenerator.com/static/schnell.webp")
                 .WithColor(Discord.Color.Red)
                 .WithCurrentTimestamp()

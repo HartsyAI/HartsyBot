@@ -288,7 +288,7 @@ namespace Hartsy.Core.InteractionComponents
                 EmbedBuilder updatedEmbed = new EmbedBuilder()
                     .WithAuthor(user)
                     .WithTitle(isFinal ? "✨ GIF Generation Completed!" : "✨ GIF Generation in Progress...")
-                    .WithThumbnailUrl($"https://github.com/kalebbroo/Hartsy/blob/main/images/logo.png?raw=true")
+                    .WithThumbnailUrl($"https://github.com/kalebbroo/HartsyBot/blob/main/images/logo.png?raw=true")
                     .WithImageUrl($"attachment://new_image.{suffix}")
                     .WithColor(isFinal ? Discord.Color.Green : Discord.Color.Red)
                     .WithDescription($"Estimated Time Remaining: **{ETR}**")
@@ -296,7 +296,7 @@ namespace Hartsy.Core.InteractionComponents
                     .AddField("Progress", isFinal ? "100%" : "Ongoing", true)
                     .WithFooter(footer => footer
                         .WithText("Powered by Hartsy.AI")
-                        .WithIconUrl("https://github.com/kalebbroo/Hartsy/blob/main/images/logo.png?raw=true"))
+                        .WithIconUrl("https://github.com/kalebbroo/HartsyBot/blob/main/images/logo.png?raw=true"))
                     .WithTimestamp(DateTimeOffset.Now);
                 ComponentBuilder componentBuilder = new();
                 if (isFinal)

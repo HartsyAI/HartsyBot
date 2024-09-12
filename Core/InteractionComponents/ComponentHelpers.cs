@@ -32,16 +32,33 @@ namespace Hartsy.Core.InteractionComponents
         /// <returns>A tuple containing the text, description, and template extracted from the embed.</returns>
         public static (string text, string description, string template) ParseEmbed(IEmbed embed)
         {
-            string embedDescription = embed.Description ?? "";
-            string textPattern = @"\*\*Text:\*\*\s*(.+?)\n\n";
-            string descriptionPattern = @"\*\*Extra Description:\*\*\s*(.+?)\n\n";
-            string templatePattern = @"\n\n\*\*Template Used:\*\*\s*(.+?)\n\n";
-            Match textMatch = Regex.Match(embedDescription, textPattern);
-            Match descriptionMatch = Regex.Match(embedDescription, descriptionPattern);
-            Match templateMatch = Regex.Match(embedDescription, templatePattern);
-            string text = textMatch.Groups[1].Value.Trim();
-            string description = descriptionMatch.Groups[1].Value.Trim();
-            string template = templateMatch.Groups[1].Value.Trim();
+            string text = "";
+            string description = "";
+            string template = "";
+            string templateDescription = "";
+            foreach (EmbedField field in embed.Fields)
+            {
+                switch (field.Name)
+                {
+                    case "Text":
+                        text = field.Value.TrimStart('`').TrimEnd('`');
+                        break;
+                    case "Description":
+                        description = field.Value.TrimStart('`').TrimEnd('`');
+                        break;
+                    case "Template":
+                        template = field.Value.TrimStart('`').TrimEnd('`');
+                        break;
+                    case "Template Description":
+                        templateDescription = field.Value.TrimStart('`').TrimEnd('`');
+                        break;
+                }
+            }
+            // Debugging: Output the parsed values
+            Console.WriteLine($"Parsed Text: {text}");
+            Console.WriteLine($"Parsed Description: {description}");
+            Console.WriteLine($"Parsed Template: {template}");
+            Console.WriteLine($"Parsed Template Description: {templateDescription}");
             return (text, description, template);
         }
     }

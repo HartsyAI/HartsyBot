@@ -1,11 +1,6 @@
 ﻿using Newtonsoft.Json.Linq;
 using Postgrest.Attributes;
 using Postgrest.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Hartsy.Core.SupaBase.Models
 {
@@ -14,8 +9,6 @@ namespace Hartsy.Core.SupaBase.Models
     public class Template : BaseModel
     {
         [PrimaryKey("id", false)]
-        public long? Id { get; set; }
-        [Column("prompt")]
         public string? Prompt { get; set; }
         [Column("positive")]
         public string? Positive { get; set; }
